@@ -15,6 +15,7 @@
 - `docs/decisions/0001-art-direction.md`：基于玩家反馈覆盖旧版第八章的**最新视觉决议**。
 - `docs/decisions/0002-characters-and-prologue.md`：开局角色关系和序章执行规则。
 - `docs/roadmap.md`：Alpha 0.1 开发阶段和验收条件。
+- `docs/ui/alpha-m1-interface-entry-plan.md`：**UI 开工蓝图（草案）**，含页面树、状态清单、组件、跨界面闭环和未确认导航决策。
 - `docs/decisions/0003-ceo-delegation.md`：**玩家是公司老板**，委派员工寻找/接洽新艺人、汇报候选人，玩家批准合同与重大经营决策。
 - `docs/design/artist-career-and-emergent-stories.md`：艺人职业路线、作品履历与经营过程生成的故事（分阶段开发草案）。
 - `prototypes/galgame-v0.2.html`：**可直接用浏览器打开试玩**的 V0.2 Galgame 交互原型（设计参考，尚非 React 正式引擎）。

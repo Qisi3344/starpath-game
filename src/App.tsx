@@ -1,25 +1,138 @@
-import {useState} from 'react';
-import {getFans, reduceGame, start} from './game/engine.mjs';
+import {useReducer, useState} from 'react';
+import {start, reduceGame, type GameState} from './game/engine.mjs';
+import {initialNav, reduceNav} from './ui/navigation';
+import {GameShell} from './ui/GameShell';
+import {StoryPlayer, type StoryView} from './story/StoryPlayer';
+import {PROLOGUE} from './story/script';
+import {MapPage, CompanyPage, ArtistsPage, GigsPage, ProfilePage, PhonePage} from './pages/shell-pages';
+import {PageHeader} from './ui/components';
 
-type GameState={day:number;company:string;money:number;reputation:number;artistSigned:boolean;trained:boolean;jobAccepted:boolean;pr:string|null;settled:boolean;history:string[]};
-type Action={type:string;method?:string};
-const WELCOME='三年前，星煌娱乐夺走了你的舞台。如今，你用两百万和一间小小的工作室，重新开始。';
-function Dialog({speaker,children}:{speaker:string;children:React.ReactNode}){return <div className="dialog"><div className="speaker">{speaker}</div><div>{children}</div></div>}
-export default function App(){
-  const [name,setName]=useState('星芒事务所');
-  const [game,setGame]=useState<GameState|null>(null);
-  const [error,setError]=useState('');
-  const act=(action:Action)=>{if(!game)return;try{setGame(reduceGame(game,action) as GameState);setError('')}catch(e){setError(e instanceof Error?e.message:'操作失败')}};
-  const actions = (items:{label:string;type:string;method?:string}[])=>items.map(a=><button key={a.label} className="action" onClick={()=>act(a)}>{a.label}<span>›</span></button>);
-  const restart=()=>{setGame(null);setError('')};
-  return <div className="layout"><aside className="side"><div className="eyebrow">ENTERTAINMENT MANAGEMENT × VISUAL NOVEL</div><h1>星途计划<span>✦</span></h1><p>那些被夺走的星光，终有一天会再度亮起。</p><div className="line"/><p>Alpha 0.1 · 开发骨架</p><a href="/prototypes/galgame-v0.2.html" target="_blank" rel="noreferrer">查看完整 V0.2 视觉试玩 ↗</a></aside>
-    <main className="phone"><header><span>STARPATH / CHAPTER 00</span><span>✧</span></header><div className="sky"><div className="glow"/><div className="window"><div className="windowbar"/><div className="city"/></div><div className="desk"/></div>
-      <div className="topbar"><span>{game?`第1年 · 1月${game.day}日`:'序章 · 重新启程'}</span><span>{game?.company??'未命名工作室'}</span></div>
-      {game && <div className="resources"><span>资金 <b>{game.money.toFixed(2)}万</b></span><span>口碑 <b>{game.reputation}</b></span><span>人气 <b>{getFans(game).toLocaleString()}</b></span></div>}
-      <div className="stage-content">{!game?<><Dialog speaker="旁白">{WELCOME}</Dialog><div className="panel"><label htmlFor="company">给公司取个名字</label><input id="company" maxLength={20} value={name} onChange={e=>setName(e.target.value)}/><button className="action" onClick={()=>setGame(start(name) as GameState)}>正式开业 <span>›</span></button></div></>:
-      <><Dialog speaker={game.day===1?'林知夏':game.day===5?'林知夏':game.day===7?'旁白':'陆星遥'}>
-        {game.day===1?'「我回来了。文件放桌上了，至于第一次签约的人选……她刚刚来过电话。」':game.day===2?'「我会努力的！今天是去练习，还是先找通告？」':game.day===3?'「《夏日邻座》正在招新人，真的可以让我去试试吗？」':game.day===4?'拍摄进行中。导演认可了这位认真又有些生涩的新人。':game.day===5?'「星煌又发声了。你打算让律师出面，还是自己回应？」':game.day===6?'「我把公关反馈收齐了。明天就是通告结算日。」':game.settled?'第一周结束。舞台很远，但你们走出了第一步。':'第一周的账目已经送达。'}</Dialog>
-      <div className="panel">{game.day===1?actions([{label:'签约陆星遥',type:'SIGN'}]):game.day===2?actions([{label:'训练唱跳 · -1万',type:'TRAIN'},{label:'优先寻找通告',type:'SKIP_TRAIN'}]):game.day===3?actions([{label:'接下《夏日邻座》',type:'ACCEPT_JOB'}]):game.day===4?actions([{label:'前往下一事件',type:'ADVANCE'}]):game.day===5?actions([{label:'委托律师 · -20万，口碑+5',type:'PR',method:'lawyer'},{label:'公开说明 · 口碑+2',type:'PR',method:'statement'},{label:'冷处理 · 口碑-5',type:'PR',method:'cold'}]):game.day===6?actions([{label:'前往周结算',type:'TO_SETTLEMENT'}]):!game.settled?actions([{label:'确认第一周结算',type:'SETTLE'}]):<button className="action" onClick={restart}>重新体验 <span>↻</span></button>}{error&&<div role="alert" className="error">{error}</div>}</div></>}
-      </div><footer><span>STARPATH · ALPHA SHELL</span><span>{game?`${game.day}/7`:'00/07'}</span></footer>
-    </main><aside className="side right"><div className="eyebrow">DEVELOPMENT NOTE</div><h2>一间小小的公司，<br/>一个不肯认输的你。</h2><p>本页面是正式 React 架构的交互骨架，用于验证状态变更和业务引擎；剧情视觉、立绘和完整交互请参看 V0.2 原型。</p><div className="line"/><p>下一里程碑：完成第一个游戏月的可玩经营循环。</p></aside></div>
+/*
+ * App 接线：世界状态（engine）+ 剧情进度 + 导航三个状态源。
+ * 页面组件只消费状态；资金分成、随机等业务规则全部留在 engine（蓝图第六节）。
+ */
+
+function stepText(idx: number, mood: string | null, g: GameState | null): string {
+  const step = PROLOGUE[idx];
+  const ctx = {company: g?.company ?? '星芒工作室', mood, trained: g?.trained ?? false, pr: g?.pr ?? null};
+  return typeof step.text === 'function' ? step.text(ctx) : step.text;
+}
+
+/** 进入某步时按序执行其转场引擎动作，返回新世界状态 */
+function withEnter(idx: number, g: GameState | null): GameState | null {
+  const enter = PROLOGUE[idx].enter;
+  if (!enter || !g) return g;
+  let s = g;
+  for (const a of enter) s = reduceGame(s, a);
+  return s;
+}
+
+const freshStory = (): StoryView => ({idx: 0, mood: null, curtain: 'none', backlog: [
+  {who: PROLOGUE[0].who, text: stepText(0, null, null)},
+]});
+
+export default function App() {
+  const [game, setGame] = useState<GameState | null>(null);
+  const [story, setStory] = useState<StoryView>(freshStory);
+  const [nav, dispatchNav] = useReducer(reduceNav, undefined, () => ({...initialNav(), overlay: 'story' as const, returnTo: {tab: 'company' as const, stack: []}}));
+  const [unread, setUnread] = useState(0);
+  const [error, setError] = useState('');
+
+  const storyNext = () => {
+    if (PROLOGUE[story.idx].decision) return;
+    const next = Math.min(story.idx + 1, PROLOGUE.length - 1);
+    if (next === story.idx) return;
+    try {
+      const g2 = withEnter(next, game);
+      if (g2 !== game) setGame(g2);
+      setStory({...story, idx: next, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[next].who, text: stepText(next, story.mood, g2)}]});
+    } catch (e) { setError(e instanceof Error ? e.message : '推进失败'); }
+  };
+
+  const storyChoice = (value: string) => {
+    const step = PROLOGUE[story.idx];
+    const res = step.resolve?.[value];
+    if (!res) return;
+    setError('');
+    if (res.curtain === 'resume' || res.curtain === 'contract') { setStory({...story, curtain: res.curtain}); return; }
+    let g2 = game;
+    try {
+      if (res.engine && g2) {
+        let s = g2;
+        for (const a of res.engine) s = reduceGame(s, a);
+        g2 = s;
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); return; }
+    if (res.engine && g2 !== game) setGame(g2);
+    const mood = step.decision === 'mood' ? value : story.mood;
+    if (res.curtain === 'settlement') { setStory({...story, mood, curtain: 'settlement'}); return; }
+    setStory({...story, idx: res.next, mood, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[res.next].who, text: stepText(res.next, mood, g2)}]});
+  };
+
+  const storySkip = () => {
+    let idx = story.idx;
+    let g2 = game;
+    try {
+      while (!PROLOGUE[idx].decision && idx < PROLOGUE.length - 1) {
+        idx += 1;
+        const g3 = withEnter(idx, g2);
+        if (g3 !== g2) g2 = g3;
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : '跳转失败'); return; }
+    if (g2 !== game) setGame(g2);
+    setStory({...story, idx, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[idx].who, text: stepText(idx, story.mood, g2)}]});
+  };
+
+  // 命名确认 → 公司成立（day 1）→ 进入"念名字"一步（V0.2 同款步序）
+  const storyName = (name: string) => {
+    const g2 = start(name);
+    setGame(g2);
+    setUnread(1);
+    setStory(prev => ({...prev, idx: 6, curtain: 'none', backlog: [...prev.backlog, {who: PROLOGUE[6].who, text: stepText(6, prev.mood, g2)}]}));
+  };
+
+  const storyRestart = () => {
+    setGame(null);
+    setError('');
+    setStory(freshStory());
+    dispatchNav({type: 'SWITCH_TAB', tab: 'company'});
+    dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'});
+  };
+
+  const overlay = nav.overlay === 'story'
+    ? <StoryPlayer story={story} game={game}
+        onName={storyName} onNext={storyNext} onChoice={storyChoice} onSkip={storySkip}
+        onExit={() => dispatchNav({type: 'CLOSE_OVERLAY'})}
+        onRestart={storyRestart}
+        onDismissCurtain={() => setStory(s => ({...s, curtain: 'none'}))}
+        onConfirmSettlement={() => {setStory(s => ({...s, curtain: 'none'})); dispatchNav({type: 'CLOSE_OVERLAY'});}}/>
+    : nav.overlay === 'phone'
+      ? <PhonePage game={game} onClose={() => dispatchNav({type: 'CLOSE_OVERLAY'})}/>
+      : undefined;
+
+  const renderTab = () => {
+    // 二级页栈 M1 暂无实体页；有栈时渲染通用占位并保留返回链，防止困死
+    if (nav.stack.length > 0) return <div className="page">
+      <PageHeader title="建设中" subtitle={nav.stack[nav.stack.length - 1]} onBack={() => dispatchNav({type: 'BACK'})}/>
+      <p className="page-note">该页面在 M1 后续步骤接入。</p>
+    </div>;
+    switch (nav.tab) {
+      case 'map': return <MapPage/>;
+      case 'company': return <CompanyPage game={game} error={error} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})} onRestart={storyRestart}/>;
+      case 'artists': return <ArtistsPage game={game}/>;
+      case 'gigs': return <GigsPage game={game}/>;
+      case 'profile': return <ProfilePage game={game} onRestart={storyRestart}/>;
+    }
+  };
+
+  return <GameShell
+    resource={game ? {dateLabel: `第1年 · 1月${game.day}日`, money: `${game.money.toFixed(2)}万`, reputation: game.reputation} : null}
+    phoneUnread={unread}
+    onOpenPhone={() => {setUnread(0); dispatchNav({type: 'OPEN_OVERLAY', kind: 'phone'});}}
+    activeTab={nav.tab}
+    onSwitchTab={tab => dispatchNav({type: 'SWITCH_TAB', tab})}
+    chromeHidden={nav.overlay === 'story'}
+    overlay={overlay}>
+    {renderTab()}
+  </GameShell>;
 }

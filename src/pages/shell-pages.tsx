@@ -1,19 +1,80 @@
 import {CharacterPlaceholder} from '../story/CharacterPlaceholder';
 import {PageHeader, SoftCard, StatusTag, EmptyState, StatLine, PrimaryButton, GhostButton} from '../ui/components';
 import type {GameState} from '../game/engine.mjs';
+import {INDUSTRY_DISTRICTS, type DistrictId} from '../game/industry-districts';
 
 /*
  * M1 页面壳：占位页明确"建设中"而非假装可点（蓝图第六节）；
  * 有真实状态的部分接 engine（工作室总览 / 艺人 / 通告 / 手机）。
  */
 
-export function MapPage() {
+export function MapPage({onOpenDistrict}: {onOpenDistrict: (id: DistrictId) => void}) {
   return <div className="page">
-    <PageHeader title="大地图" subtitle="CITY MAP · 规划中"/>
-    <SoftCard title="娱乐圈尚未铺开">
-      <p>区域分布、竞争公司与资源点将在后续版本成为独立探索页。M1 阶段，你的重心在工作室里。</p>
+    <PageHeader title="娱乐圈" subtitle="INDUSTRY WORLD · 城市版图"/>
+    <div className="world-map" aria-label="娱乐圈五大城区">
+      <div className="map-halo" aria-hidden="true">✧</div>
+      {INDUSTRY_DISTRICTS.map((district, i) =>
+        <button type="button" key={district.id} className={`district-point district-${district.id}`}
+          onClick={() => onOpenDistrict(district.id)}
+          aria-label={`查看${district.title}，${district.group}`}>
+          <span className="district-dot" aria-hidden="true">{i + 1}</span>
+          <strong>{district.title}</strong>
+          <small>{district.group}</small>
+        </button>)}
+    </div>
+    <SoftCard tag="世界地图 · 初期可探索" title="从这里认识整个娱乐圈">
+      <p>查看每个城区的行业资源与可能出现的故事。今后可以向指定地区派遣经纪人或星探，发现通告和人才线索。</p>
+      <footer><StatusTag tone="muted">地图地点可查看 · 派遣功能待开发</StatusTag></footer>
     </SoftCard>
-    <EmptyState icon="✧" title="城市还在天亮之前" note="第一目标是一个游戏月的经营闭环，不是完整地图。"/>
+  </div>;
+}
+
+export function DistrictPage({districtId, onBack}: {districtId: DistrictId; onBack: () => void}) {
+  const district = INDUSTRY_DISTRICTS.find(item => item.id === districtId);
+  if (!district) return <div className="page"><PageHeader title="未知地区" onBack={onBack}/></div>;
+  return <div className="page">
+    <PageHeader title={district.title} subtitle={district.group} onBack={onBack}/>
+    <div className="district-hero"><span>INDUSTRY AREA / {district.title}</span><h3>{district.group}</h3></div>
+    <SoftCard tag="区域介绍" title="在这里会遇到什么？">
+      <p>{district.desc}</p>
+      <StatLine label="预计资源类型" value={district.opportunities}/>
+    </SoftCard>
+    <SoftCard title="经纪人外派">
+      <p>未来在这里选择员工、目标、预算和天数，完成任务后通过手机收到进展报告。</p>
+      <footer><StatusTag tone="muted">尚未开放：不扣资金、不推进游戏日</StatusTag></footer>
+    </SoftCard>
+    <GhostButton onClick={onBack}>〈 返回娱乐圈地图</GhostButton>
+  </div>;
+}
+
+export function SchedulePage({game, onContinueStory}: {game: GameState | null; onContinueStory: () => void}) {
+  const day = game?.day ?? 1;
+  const schedule = game
+    ? game.settled ? '第一周已结算，第二周日程功能即将接入。'
+      : !game.artistSigned ? '等待陆星遥签约。'
+      : day === 2 ? '陆星遥今日可安排唱跳培训，决策仍在序章剧情中进行。'
+      : day === 3 ? '《夏日邻座》正在等待你的通告决定。'
+      : day === 4 ? '陆星遥正在参与综艺录制。'
+      : day === 5 ? '星煌舆情事件，等待老板选择公关方案。'
+      : '经纪人正在整理本周通告和财务资料。'
+    : '完成公司命名后，日程将在这里显示。';
+  return <div className="page">
+    <PageHeader title="日程" subtitle="SCHEDULE · 艺人培养与员工委派"/>
+    <SoftCard tag="第1年 · 第1月" title={`第 ${day} 日的安排`}>
+      <div className="week-strip" aria-label="第一周游戏日">
+        {[1,2,3,4,5,6,7].map(n =>
+          <span key={n} className={`week-day${day === n ? ' is-current' : ''}`}>{n}日</span>)}
+      </div>
+      <p>{schedule}</p>
+      {game && !game.settled && <footer><PrimaryButton onClick={onContinueStory}>回到剧情处理当前任务 →</PrimaryButton></footer>}
+    </SoftCard>
+    <SoftCard tag="助理与星探" title="委派任务">
+      <p>正式版中你可以安排林知夏执行新人寻访和商务接洽；当前没有已运行的派遣任务。</p>
+      <footer><StatusTag tone="muted">委派引擎接入 M1 后续阶段</StatusTag></footer>
+    </SoftCard>
+    <SoftCard tag="档期" title="跨艺人排期">
+      <p>未来可在这里查看、调整通告、培养与外派的时间冲突。现在不伪造空档或完成结果。</p>
+    </SoftCard>
   </div>;
 }
 
@@ -76,7 +137,7 @@ export function ArtistsPage({game}: {game: GameState | null}) {
               <StatusTag tone={game?.day === 4 ? 'warn' : 'ok'}>{game?.day === 4 ? '通告中' : '空档'}</StatusTag>
             </div>
           </div>
-          <StatLine label="唱跳能力" value="55 / 100"/>
+          <StatLine label="唱跳能力" value={`${55 + (game?.trained ? 3 : 0)} / 100`}/>
           <StatLine label="颜值" value="82 / 100"/>
           <StatLine label="路人缘" value="45 / 100"/>
           <p className="quote">「这一次，我也想陪你站到光里。」</p>

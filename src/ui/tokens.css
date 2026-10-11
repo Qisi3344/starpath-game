@@ -1,27 +1,27 @@
 /*
  * M1 UI tokens · 语义层
- * 数值为草案，取自已获认可的 V0.2 视觉试玩（ADR-0001 依据）。
+ * 玩家已确认唯一视觉方向 C（ADR-0004）；以下为 C 的初步取色，可按实际视觉验收细调。
  * 正式游戏只有一套主题；组件引用语义名，美术定稿后统一调整单套 token 数值。
  */
 :root {
   /* surface: 底与浮起 */
-  --surface-base: #f7f0ee;          /* 页面底 · 暖灰奶油 */
-  --surface-stage: #eae3e1;         /* 竖屏舞台外围 */
-  --surface-raised: #fffaf8;        /* 卡片 · 奶油白 */
-  --surface-overlay: rgba(255, 250, 245, .95); /* 浮层/对白底 */
-  --surface-sunken: #efe4e2;        /* 输入框/进度槽 */
+  --surface-base: #f8f0ed;          /* 页面底 · 暖灰奶油 */
+  --surface-stage: #eadfdf;         /* 竖屏舞台外围 */
+  --surface-raised: #fffbf8;        /* 卡片 · 奶油白 */
+  --surface-overlay: rgba(255, 250, 249, .96); /* 浮层/对白底 */
+  --surface-sunken: #efe4e6;        /* 输入框/进度槽 */
 
   /* text */
-  --text-main: #4d424f;             /* 墨紫灰 */
-  --text-muted: #877987;
-  --text-faint: #aa969b;
+  --text-main: #57434e;             /* 墨紫灰 */
+  --text-muted: #8c7682;
+  --text-faint: #ae969e;
   --text-on-accent: #ffffff;
 
   /* accent */
-  --accent-primary: #a67f96;        /* 深莓紫 · 主行动 */
-  --accent-soft: #d39eaa;           /* 低饱和暖粉 · 次级强调 */
-  --accent-gold: #c4a47b;           /* 香槟金 · 点缀/货币 */
-  --accent-line: #e6dcd9;           /* 分隔线 */
+  --accent-primary: #966a80;        /* 深莓紫 · 主行动 */
+  --accent-soft: #d5a7b2;           /* 低饱和暖粉 · 次级强调 */
+  --accent-gold: #ceb391;           /* 香槟金 · 点缀/货币 */
+  --accent-line: #eadcda;           /* 分隔线 */
 
   /* status */
   --status-danger: #bd4e66;
@@ -39,7 +39,7 @@
 
   /* type */
   --font-ui: system-ui, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
-  --font-display: Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+  --font-display: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --fs-caption: 10px;   /* 眉标/脚注 */
   --fs-label: 12px;     /* 标签/说明 */
   --fs-body: 14px;      /* 正文 */

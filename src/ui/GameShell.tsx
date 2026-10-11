@@ -6,10 +6,11 @@ import type {TabId} from '../game/types';
  * 游戏壳：竖屏主舞台。PC 居中呈现 412px 舞台并保留两侧开发文案栏；
  * 移动端全屏 + safe-area。Tab 与顶部条在全屏剧情层下隐藏。
  */
-export function GameShell({resource, phoneUnread, onOpenPhone, activeTab, onSwitchTab, chromeHidden, overlay, children}: {
+export function GameShell({resource, phoneUnread, onOpenPhone, onOpenProfile, activeTab, onSwitchTab, chromeHidden, overlay, children}: {
   resource: {dateLabel: string; money: string; reputation: number} | null;
   phoneUnread: number;
   onOpenPhone: () => void;
+  onOpenProfile: () => void;
   activeTab: TabId;
   onSwitchTab: (tab: TabId) => void;
   /** 剧情全屏/结算模态时隐藏 Tab 栏与资源条 */
@@ -30,6 +31,7 @@ export function GameShell({resource, phoneUnread, onOpenPhone, activeTab, onSwit
     <main className="phone">
       <div className="status-strip"><span>✦ STARPATH</span><span>ALPHA M1</span></div>
       {!chromeHidden && <div className="chrome-top">
+        <button className="profile-entry" onClick={onOpenProfile} aria-label="打开个人档案" title="老板个人档案">◉</button>
         {resource
           ? <div className="resources" role="status">
               <span>{resource.dateLabel}</span>
@@ -44,6 +46,7 @@ export function GameShell({resource, phoneUnread, onOpenPhone, activeTab, onSwit
       <div className="stage">{children}</div>
       {!chromeHidden && <nav className="bottom-nav" aria-label="主导航">
         {TABS.map(t => <button key={t.id} className={`navbtn${activeTab === t.id ? ' active' : ''}`}
+          aria-current={activeTab === t.id ? 'page' : undefined}
           onClick={() => onSwitchTab(t.id)}>
           <span aria-hidden>{t.icon}</span>{t.label}
         </button>)}

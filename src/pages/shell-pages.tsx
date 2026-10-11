@@ -1,3 +1,4 @@
+import {CharacterPlaceholder} from '../story/CharacterPlaceholder';
 import {PageHeader, SoftCard, StatusTag, EmptyState, StatLine, PrimaryButton, GhostButton} from '../ui/components';
 import type {GameState} from '../game/engine.mjs';
 
@@ -69,7 +70,7 @@ export function ArtistsPage({game}: {game: GameState | null}) {
     {signed
       ? <SoftCard tag="D 级偶像 · 第一位签约艺人" title="陆星遥">
           <div className="artist-row">
-            <div className="artist-avatar" aria-hidden>✧</div>
+            <div className="artist-avatar portrait-placeholder" aria-label="陆星遥临时黑白人物剪影"><CharacterPlaceholder characterId="lu"/></div>
             <div>
               <p>前核心后援会会长 · 初始人气 5,000</p>
               <StatusTag tone={game?.day === 4 ? 'warn' : 'ok'}>{game?.day === 4 ? '通告中' : '空档'}</StatusTag>

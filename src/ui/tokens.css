@@ -58,3 +58,32 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/*
+ * 美术方向 A 主题层（寒枝效果图 · 提案，未确认；见 docs/ui/art-direction-a-visual-spec.md）
+ * 绮思确认后在根节点挂 data-art="direction-a" 启用；默认仍为上面的 V0.2 基准。
+ * 差异要点：底色暖米金、文字转暖棕、玫瑰豆沙主强调、金点缀强化、新增分类辅助色板。
+ */
+:root[data-art="direction-a"] {
+  --surface-base: #f6efe7;
+  --surface-stage: #efe4d8;
+  --surface-raised: #fffdf9;
+  --surface-overlay: rgba(255, 253, 249, .95);
+  --surface-sunken: #f2e7dd;
+
+  --text-main: #4f4139;
+  --text-muted: #8d7f75;
+  --text-faint: #b3a294;
+
+  --accent-primary: #c17f92;
+  --accent-primary-deep: #b06a80;
+  --accent-soft: #f4dfe0;
+  --accent-gold: #d9b98a;
+  --accent-line: #ecdfd3;
+
+  /* 分类辅助色板：日程色块、候选人职业徽章 */
+  --cat-violet: #e6dff0;
+  --cat-blue: #dfe9f4;
+  --cat-pink: #f7e3e4;
+  --cat-gold: #f4ead8;
+}

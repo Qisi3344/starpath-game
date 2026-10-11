@@ -170,3 +170,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-prim
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* 统一立绘占位组件：列表与剧情共用 characterId，纯黑白透明剪影 */
+.portrait-placeholder { overflow: hidden; background: #f3eff0; }
+.portrait-placeholder svg { display: block; width: 100%; height: 100%; }

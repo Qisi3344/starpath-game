@@ -17,8 +17,8 @@ export type Artist = {
   id: string;
   name: string;
   track: CareerTrack;
-  /** 等级沿用 V1.6.2：S/A/B/C/D */
-  grade: 'S' | 'A' | 'B' | 'C' | 'D';
+  /** 等级沿用 V1.6.2：SS/S/A/B/C/D */
+  grade: 'SS' | 'S' | 'A' | 'B' | 'C' | 'D';
   /** 核心数值 0-100 */
   stats: { performance: number; appearance: number; appeal: number };
   fans: number;
@@ -68,7 +68,7 @@ export type Candidate = {
   id: string;
   identity: string;
   currentStatus: 'unknown' | 'contacted' | 'negotiating' | 'rejected' | 'signedElsewhere' | 'expired';
-  profile: { track: CareerTrack; grade: 'S' | 'A' | 'B' | 'C' | 'D'; highlight: string; risk?: string };
+  profile: { track: CareerTrack; grade: 'SS' | 'S' | 'A' | 'B' | 'C' | 'D'; highlight: string; risk?: string };
   expectations: string;
   /** 时效：到期未处理则失联 */
   expiry: GameDate;
@@ -129,8 +129,8 @@ export type SaveMeta = {
 };
 
 /** 视图落点：读档恢复界面用；tab + 二级栈 + 全屏层 */
-export type TabId = 'map' | 'company' | 'artists' | 'gigs' | 'profile';
-export type OverlayKind = 'none' | 'story' | 'phone' | 'settlement';
+export type TabId = 'company' | 'artists' | 'map' | 'schedule' | 'gigs';
+export type OverlayKind = 'none' | 'story' | 'phone' | 'profile' | 'settlement';
 export type ViewLocation = {
   tab: TabId;
   /** 二级页栈，空数组即 Tab 首屏 */

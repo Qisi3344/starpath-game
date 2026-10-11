@@ -4,8 +4,9 @@ import {initialNav, reduceNav} from './ui/navigation';
 import {GameShell} from './ui/GameShell';
 import {StoryPlayer, type StoryView} from './story/StoryPlayer';
 import {PROLOGUE} from './story/script';
-import {MapPage, CompanyPage, ArtistsPage, GigsPage, ProfilePage, PhonePage} from './pages/shell-pages';
+import {MapPage, DistrictPage, SchedulePage, CompanyPage, ArtistsPage, GigsPage, ProfilePage, PhonePage} from './pages/shell-pages';
 import {PageHeader} from './ui/components';
+import type {DistrictId} from './game/industry-districts';
 
 /*
  * App 接线：世界状态（engine）+ 剧情进度 + 导航三个状态源。
@@ -95,8 +96,7 @@ export default function App() {
     setGame(null);
     setError('');
     setStory(freshStory());
-    dispatchNav({type: 'SWITCH_TAB', tab: 'company'});
-    dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'});
+    dispatchNav({type: 'RESET', openStory: true});
   };
 
   const overlay = nav.overlay === 'story'
@@ -108,20 +108,31 @@ export default function App() {
         onConfirmSettlement={() => {setStory(s => ({...s, curtain: 'none'})); dispatchNav({type: 'CLOSE_OVERLAY'});}}/>
     : nav.overlay === 'phone'
       ? <PhonePage game={game} onClose={() => dispatchNav({type: 'CLOSE_OVERLAY'})}/>
+    : nav.overlay === 'profile'
+      ? <div className="profile-sheet" role="dialog" aria-label="老板个人档案">
+          <button className="pale-btn profile-close" onClick={() => dispatchNav({type: 'CLOSE_OVERLAY'})}>返回 ×</button>
+          <ProfilePage game={game} onRestart={storyRestart}/>
+        </div>
       : undefined;
 
   const renderTab = () => {
     // 二级页栈 M1 暂无实体页；有栈时渲染通用占位并保留返回链，防止困死
-    if (nav.stack.length > 0) return <div className="page">
-      <PageHeader title="建设中" subtitle={nav.stack[nav.stack.length - 1]} onBack={() => dispatchNav({type: 'BACK'})}/>
-      <p className="page-note">该页面在 M1 后续步骤接入。</p>
-    </div>;
+    if (nav.stack.length > 0) {
+      const pageId = nav.stack[nav.stack.length - 1];
+      if (nav.tab === 'map' && pageId.startsWith('district:'))
+        return <DistrictPage districtId={pageId.slice(9) as DistrictId}
+          onBack={() => dispatchNav({type: 'BACK'})}/>;
+      return <div className="page">
+        <PageHeader title="建设中" subtitle={pageId} onBack={() => dispatchNav({type: 'BACK'})}/>
+        <p className="page-note">该页面在 M1 后续步骤接入。</p>
+      </div>;
+    }
     switch (nav.tab) {
-      case 'map': return <MapPage/>;
+      case 'map': return <MapPage onOpenDistrict={id => dispatchNav({type: 'PUSH', page: 'district:' + id})}/>;
       case 'company': return <CompanyPage game={game} error={error} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})} onRestart={storyRestart}/>;
       case 'artists': return <ArtistsPage game={game}/>;
+      case 'schedule': return <SchedulePage game={game} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})}/>;
       case 'gigs': return <GigsPage game={game}/>;
-      case 'profile': return <ProfilePage game={game} onRestart={storyRestart}/>;
     }
   };
 
@@ -129,6 +140,7 @@ export default function App() {
     resource={game ? {dateLabel: `第1年 · 1月${game.day}日`, money: `${game.money.toFixed(2)}万`, reputation: game.reputation} : null}
     phoneUnread={unread}
     onOpenPhone={() => {setUnread(0); dispatchNav({type: 'OPEN_OVERLAY', kind: 'phone'});}}
+    onOpenProfile={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'profile'})}
     activeTab={nav.tab}
     onSwitchTab={tab => dispatchNav({type: 'SWITCH_TAB', tab})}
     chromeHidden={nav.overlay === 'story'}

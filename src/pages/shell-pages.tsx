@@ -1,11 +1,12 @@
 import {CharacterPlaceholder} from '../story/CharacterPlaceholder';
 import {PageHeader, SoftCard, StatusTag, EmptyState, StatLine, PrimaryButton, GhostButton} from '../ui/components';
-import type {GameState} from '../game/engine.mjs';
+import type {WorldState, SaveMeta} from '../game/world/world.d.mts';
+import {formatWan} from '../game/world/format.mjs';
 import {INDUSTRY_DISTRICTS, type DistrictId} from '../game/industry-districts';
 
 /*
- * M1 页面壳：占位页明确"建设中"而非假装可点（蓝图第六节）；
- * 有真实状态的部分接 engine（工作室总览 / 艺人 / 通告 / 手机）。
+ * M1 页面壳：全部从唯一 WorldState 读数据（契约第一节：禁止第二状态源）；
+ * 占位页明确"建设中"而非假装可点。
  */
 
 export function MapPage({onOpenDistrict}: {onOpenDistrict: (id: DistrictId) => void}) {
@@ -47,30 +48,30 @@ export function DistrictPage({districtId, onBack}: {districtId: DistrictId; onBa
   </div>;
 }
 
-export function SchedulePage({game, onContinueStory}: {game: GameState | null; onContinueStory: () => void}) {
-  const day = game?.day ?? 1;
-  const schedule = game
-    ? game.settled ? '第一周已结算，第二周日程功能即将接入。'
-      : !game.artistSigned ? '等待陆星遥签约。'
-      : day === 2 ? '陆星遥今日可安排唱跳培训，决策仍在序章剧情中进行。'
-      : day === 3 ? '《夏日邻座》正在等待你的通告决定。'
-      : day === 4 ? '陆星遥正在参与综艺录制。'
-      : day === 5 ? '星煌舆情事件，等待老板选择公关方案。'
-      : '经纪人正在整理本周通告和财务资料。'
-    : '完成公司命名后，日程将在这里显示。';
+export function SchedulePage({world, onContinueStory}: {world: WorldState; onContinueStory: () => void}) {
+  const day = world.clock.absoluteDay;
+  const f = world.story.flags;
+  const inFirstWeek = day <= 7;
+  const schedule = f.firstWeekSettled ? '第一周已结算。第二个月的日程安排将在委派与通告系统接入后开放。'
+    : !f.luSigned ? '等待陆星遥签约。'
+    : day === 2 ? '陆星遥今日可安排唱跳培训，决策仍在序章剧情中进行。'
+    : day === 3 ? '《夏日邻座》正在等待你的通告决定。'
+    : day >= 4 && day <= 6 ? '陆星遥正在参与综艺录制。'
+    : day === 5 ? '星煌舆情事件，等待老板选择公关方案。'
+    : '经纪人正在整理本周通告和财务资料。';
   return <div className="page">
     <PageHeader title="日程" subtitle="SCHEDULE · 艺人培养与员工委派"/>
-    <SoftCard tag="第1年 · 第1月" title={`第 ${day} 日的安排`}>
+    <SoftCard tag="第1年 · 第1月" title={`第 ${world.clock.day} 日的安排`}>
       <div className="week-strip" aria-label="第一周游戏日">
         {[1,2,3,4,5,6,7].map(n =>
-          <span key={n} className={`week-day${day === n ? ' is-current' : ''}`}>{n}日</span>)}
+          <span key={n} className={`week-day${inFirstWeek && world.clock.day === n ? ' is-current' : ''}${f.firstWeekSettled || world.clock.day > n ? ' is-past' : ''}`}>{n}日</span>)}
       </div>
       <p>{schedule}</p>
-      {game && !game.settled && <footer><PrimaryButton onClick={onContinueStory}>回到剧情处理当前任务 →</PrimaryButton></footer>}
+      {inFirstWeek && !f.firstWeekSettled && <footer><PrimaryButton onClick={onContinueStory}>回到剧情处理当前任务 →</PrimaryButton></footer>}
     </SoftCard>
     <SoftCard tag="助理与星探" title="委派任务">
       <p>正式版中你可以安排林知夏执行新人寻访和商务接洽；当前没有已运行的派遣任务。</p>
-      <footer><StatusTag tone="muted">委派引擎接入 M1 后续阶段</StatusTag></footer>
+      <footer><StatusTag tone="muted">委派引擎接入 M1 后续阶段（B1）</StatusTag></footer>
     </SoftCard>
     <SoftCard tag="档期" title="跨艺人排期">
       <p>未来可在这里查看、调整通告、培养与外派的时间冲突。现在不伪造空档或完成结果。</p>
@@ -78,120 +79,151 @@ export function SchedulePage({game, onContinueStory}: {game: GameState | null; o
   </div>;
 }
 
-function todoFor(game: GameState): {title: string; note: string} {
-  if (game.settled) return {title: '第一周，顺利结束', note: '第一位艺人的首个通告已完成。新的章节即将开始。'};
-  if (!game.artistSigned) return {title: '一份还没签字的合同', note: '陆星遥正在等待你的答复。别让第一份信任等太久。'};
-  if (game.day === 2) return {title: '安排明天的行程', note: '训练还是先找通告？把刚刚起步的公司一点点做起来。'};
-  if (game.day === 3) return {title: '第一个通告机会', note: '《夏日邻座》正在招新人，决定要不要接下它。'};
-  if (game.day === 4) return {title: '通告执行中', note: '星遥正在录制现场。等待她的第一份工作汇报。'};
-  if (game.day === 5) return {title: '热搜危机待决策', note: '星煌发声试探。公关路线需要你来定。'};
+function todoFor(world: WorldState): {title: string; note: string} {
+  const f = world.story.flags;
+  const day = world.clock.absoluteDay;
+  if (f.firstWeekSettled) return {title: '第一周，顺利结束', note: '第一位艺人的首个通告已完成。新的章节即将开始。'};
+  if (!f.luSigned) return {title: '一份还没签字的合同', note: '陆星遥正在等待你的答复。别让第一份信任等太久。'};
+  if (day === 2) return {title: '安排今天的行程', note: '训练还是先找通告？把刚刚起步的公司一点点做起来。'};
+  if (day === 3) return {title: '第一个通告机会', note: '《夏日邻座》正在招新人，决定要不要接下它。'};
+  if (day >= 4 && day <= 6) return {title: '通告执行中', note: '星遥正在录制现场。等待她的第一份工作汇报。'};
+  if (day === 5) return {title: '热搜危机待决策', note: '星煌发声试探。公关路线需要你来定。'};
   return {title: '结算日到了', note: '公关反馈收齐了。确认第一周的账目。'};
 }
 
-export function CompanyPage({game, error, onContinueStory, onRestart}: {
-  game: GameState | null;
+export function CompanyPage({world, error, onContinueStory, onRestart, onAdvanceDay}: {
+  world: WorldState;
   error: string;
   onContinueStory: () => void;
   onRestart: () => void;
+  onAdvanceDay: () => void;
 }) {
-  if (!game) return <div className="page">
-    <PageHeader title="公司" subtitle="MY LITTLE COMPANY"/>
-    <EmptyState icon="⌂" title="公司还没有名字" note="完成序章剧情并命名后，这里会成为你的工作室总览。"/>
-    <PrimaryButton onClick={onContinueStory}>回到序章剧情　→</PrimaryButton>
-  </div>;
-  const todo = todoFor(game);
+  const todo = todoFor(world);
+  const f = world.story.flags;
   return <div className="page">
-    <PageHeader title="工作室" subtitle={`${game.company} · 老板总览`}/>
+    <PageHeader title="工作室" subtitle={`${world.company.name} · 老板总览`}/>
     <div className="home-hero">
       <small>MY LITTLE COMPANY · CHAPTER 00</small>
-      <h3>{game.company}<br/>从这里，重返星途。</h3>
+      <h3>{world.company.name}<br/>从这里，重返星途。</h3>
     </div>
     <SoftCard tag="待办事项" title={todo.title}>
       <p>{todo.note}</p>
-      <footer><PrimaryButton onClick={onContinueStory}>{game.settled ? '回看序章与结算' : '进入剧情 / 推进'}　→</PrimaryButton></footer>
+      <footer><PrimaryButton onClick={onContinueStory}>{f.firstWeekSettled ? '回看序章与结算' : '进入剧情 / 推进'}　→</PrimaryButton></footer>
     </SoftCard>
     <SoftCard tag="员工汇报" title="林知夏">
-      <p>{game.settled ? '「第一周的报表我整理好了。资金和口碑的变化都在结算单上。」' :
-        game.day >= 5 ? '「星煌的动向我在盯着，有变化第一时间告诉你。」' :
+      <p>{f.firstWeekSettled ? '「第一周的报表我整理好了。资金和口碑的变化都在账本里。」' :
+        world.clock.absoluteDay >= 5 ? '「星煌的动向我在盯着，有变化第一时间告诉你。」' :
         '「合同和通告都在资料夹里。别忘了按时吃饭。」'}</p>
-      <footer><StatusTag tone="ok">执行经纪 · 在岗</StatusTag></footer>
+      <footer><StatusTag tone="ok">执行经纪 · 在岗（任务容量 {world.staff.zhixia.capacity.used}/{world.staff.zhixia.capacity.max}）</StatusTag></footer>
     </SoftCard>
     {error && <div role="alert" className="error">{error}</div>}
-    {game.settled && <SoftCard title="想再走一遍？">
-      <p>重玩序章可以尝试另一种对话与公关选择。</p>
-      <footer><GhostButton onClick={onRestart}>重开序章 ↻</GhostButton></footer>
-    </SoftCard>}
+    {f.firstWeekSettled && <>
+      <SoftCard tag="时间推进 · 唯一入口" title={`今天是 ${world.clock.month} 月 ${world.clock.day} 日`}>
+        <p>推进一天：员工与艺人执行当天安排，账目入账本，新的汇报会送到手机。出现必须处理的事件时推进会被暂停。</p>
+        <footer><PrimaryButton onClick={onAdvanceDay}>推进到下一天　›</PrimaryButton></footer>
+      </SoftCard>
+      <SoftCard title="想再走一遍？">
+        <p>重玩序章可以尝试另一种对话与公关选择。</p>
+        <footer><GhostButton onClick={onRestart}>重开序章 ↻</GhostButton></footer>
+      </SoftCard>
+    </>}
   </div>;
 }
 
-export function ArtistsPage({game}: {game: GameState | null}) {
-  const signed = game?.artistSigned ?? false;
+export function ArtistsPage({world}: {world: WorldState}) {
+  const lu = world.artists.lu;
   return <div className="page">
     <PageHeader title="艺人" subtitle="TALENT ROSTER"/>
-    {signed
-      ? <SoftCard tag="D 级偶像 · 第一位签约艺人" title="陆星遥">
+    {lu
+      ? <SoftCard tag={`${lu.grade} 级偶像 · 第一位签约艺人`} title={lu.name}>
           <div className="artist-row">
             <div className="artist-avatar portrait-placeholder" aria-label="陆星遥临时黑白人物剪影"><CharacterPlaceholder characterId="lu"/></div>
             <div>
-              <p>前核心后援会会长 · 初始人气 5,000</p>
-              <StatusTag tone={game?.day === 4 ? 'warn' : 'ok'}>{game?.day === 4 ? '通告中' : '空档'}</StatusTag>
+              <p>前核心后援会会长 · 人气 {lu.fans.toLocaleString()}</p>
+              <StatusTag tone={lu.availability === 'onGig' ? 'warn' : 'ok'}>{lu.availability === 'onGig' ? '通告中' : '空档'}</StatusTag>
             </div>
           </div>
-          <StatLine label="唱跳能力" value={`${55 + (game?.trained ? 3 : 0)} / 100`}/>
-          <StatLine label="颜值" value="82 / 100"/>
-          <StatLine label="路人缘" value="45 / 100"/>
+          <StatLine label="唱跳能力" value={`${lu.stats.performance} / 100`}/>
+          <StatLine label="颜值" value={`${lu.stats.appearance} / 100`}/>
+          <StatLine label="路人缘" value={`${lu.stats.appeal} / 100`}/>
+          {lu.history.length > 0 && <StatLine label="最近履历" value={lu.history[lu.history.length - 1].note}/>}
           <p className="quote">「这一次，我也想陪你站到光里。」</p>
         </SoftCard>
       : <EmptyState icon="♧" title="等待新成员" note="你的工作室尚未签约艺人。故事第一天，陆星遥会带着简历出现。"/>}
   </div>;
 }
 
-export function GigsPage({game}: {game: GameState | null}) {
-  const job = game?.jobAccepted ?? false;
+export function GigsPage({world}: {world: WorldState}) {
+  const gig = Object.values(world.gigs)[0];
+  const statusLabel = {available: '可接取', booked: '已接 · 待录制', shooting: '录制中', released: '已完成'} as Record<string, string>;
   return <div className="page">
     <PageHeader title="通告" subtitle="GIG MARKET"/>
-    {job
-      ? <SoftCard tag="青柠视频 · 新人综艺" title="《夏日邻座》">
-          <p>三日录制，新人生活观察类轻综艺。{game?.settled ? '已结算完毕。' : '通告已经接受，等待后续安排。'}</p>
-          <StatLine label="通告报酬" value="25 万"/>
-          <StatLine label="预计公司收入" value="12.25 万"/>
-          <StatLine label="状态" value={game?.settled ? '已结算' : '进行中'}/>
+    {gig && world.story.flags.summerGigAccepted
+      ? <SoftCard tag={`${gig.platform ?? '青柠视频'} · 新人综艺`} title={gig.title}>
+          <p>三日录制，新人生活观察类轻综艺。{gig.status === 'released' ? '录制完成，账目已入账本。' : '通告已经接受，等待后续安排。'}</p>
+          <StatLine label="通告报酬" value={formatWan(gig.grossMinor)}/>
+          <StatLine label="预计公司收入" value={formatWan(gig.companyNetMinor)}/>
+          <StatLine label="状态" value={statusLabel[gig.status] ?? gig.status}/>
         </SoftCard>
       : <EmptyState icon="✦" title="市场暂时安静" note="正式的通告市场与竞标流程将在 M1 后续步骤接入。第一个机会会从剧情中到来。"/>}
   </div>;
 }
 
-export function ProfilePage({game, onRestart}: {game: GameState | null; onRestart: () => void}) {
+export function ProfilePage({world, onRestart, onSave, onLoad, saveExists, saveInfo, saveNote}: {
+  world: WorldState;
+  onRestart: () => void;
+  onSave: () => void;
+  onLoad: () => void;
+  saveExists: boolean;
+  saveInfo: SaveMeta | null;
+  saveNote: string;
+}) {
   return <div className="page">
-    <PageHeader title="我的" subtitle="FORMER SUPERSTAR"/>
+    <PageHeader title="个人档案" subtitle="FORMER SUPERSTAR"/>
     <SoftCard title="个人身份">
-      <p>过去：顶流艺人<br/>现在：经纪公司创始人{game ? <><br/>工作室：{game.company}</> : null}</p>
+      <p>过去：顶流艺人<br/>现在：经纪公司创始人<br/>工作室：{world.company.name}</p>
       <footer><StatusTag tone="muted">复仇证据 · 0 / 3</StatusTag></footer>
     </SoftCard>
-    <SoftCard title="存读档">
-      <p>存读档系统在 M1 月末结算步骤接入；当前刷新页面后将回到工作室总览。</p>
-      <footer><StatusTag tone="muted">建设中</StatusTag></footer>
+    <SoftCard title="存读档" tag=" Issue #5">
+      {saveInfo
+        ? <StatLine label={`槽位 ${saveInfo.slot} · ${saveInfo.dateLabel}`} value={formatWan(saveInfo.cashMinor)}/>
+        : <p>槽位 0：{saveExists ? '有一个之前的存档' : '暂无存档'}</p>}
+      <p>保存会记录日期、资金、任务、候选与剧情进度；读档后世界精确回到保存瞬间，不会重新抽取结果。</p>
+      <footer>
+        <PrimaryButton onClick={onSave}>保存到槽位 0</PrimaryButton>
+        <GhostButton onClick={onLoad} >{saveExists || saveInfo ? '读取槽位 0' : '读取（暂无存档）'}</GhostButton>
+      </footer>
+      {saveNote && <p role="status">{saveNote}</p>}
+    </SoftCard>
+    <SoftCard title="本局账本" tag={`已记录 ${world.ledger.length} 笔`}>
+      {world.ledger.length === 0
+        ? <p>还没有入账记录。训练、公关与结算都会在这里留下明细。</p>
+        : <div className="ledger-list">{world.ledger.slice(-8).map(e =>
+            <StatLine key={e.id} label={`第${e.absoluteDay}日 · ${e.note}`} value={`${e.kind === 'expense' ? '−' : '+'}${formatWan(e.amountMinor)}`}/>)}</div>}
     </SoftCard>
     <SoftCard title="重新开始">
-      <p>可以重玩第一周，尝试不同的对话与公关选择。</p>
+      <p>可以重玩第一周，尝试不同的对话与公关选择。当前进度会被新开局覆盖（记得先存档）。</p>
       <footer><GhostButton onClick={onRestart}>重开序章 ↻</GhostButton></footer>
     </SoftCard>
   </div>;
 }
 
-export function PhonePage({game, onClose}: {game: GameState | null; onClose: () => void}) {
-  const signed = game?.artistSigned ?? false;
-  const settled = game?.settled ?? false;
+export function PhonePage({world, onClose}: {world: WorldState; onClose: () => void}) {
+  const signed = world.story.flags.luSigned === true;
+  const settled = world.story.flags.firstWeekSettled === true;
+  const pr = world.story.flags.prChoice;
+  const messages = Object.values(world.messages).sort((a, b) => b.absoluteDay - a.absoluteDay);
   return <div className="phone-sheet">
     <PageHeader title="手机" subtitle="MESSAGES & TRENDING"/>
     <button className="pale-btn sheet-close" onClick={onClose}>收起 ×</button>
     <div className="notifications">
       <div className="note"><b>知夏 · 置顶</b><br/>合同和通告都在资料夹里。别忘了按时吃饭。</div>
       <div className="note"><b>陆星遥</b><br/>{settled ? '节目播了！我妈妈把截图发到亲戚群里了！' : signed ? '我会加油的！今天还要练习吗？' : '听说你准备重新开公司了……可以聊聊吗？'}</div>
-      <div className="note"><b>娱乐热搜 · 今日头条</b><br/>{game?.pr ? '#过气艺人另起炉灶# · 舆情已更新' : '#春季选秀新面孔# · 热门话题'}</div>
+      <div className="note"><b>娱乐热搜 · 今日头条</b><br/>{pr ? '#过气艺人另起炉灶# · 舆情已更新' : '#春季选秀新面孔# · 热门话题'}</div>
+      {messages.map(m => <div key={m.id} className="note"><b>{m.from} · 第{m.absoluteDay}日</b><br/><strong>{m.title}</strong><br/>{m.body}</div>)}
     </div>
     <SoftCard title="审批提醒">
-      <p>{game?.pr ? '公关决策已执行，暂无待审批事项。' : '老板委派与合同审批流在 M1 后续步骤接入。'}</p>
+      <p>{pr ? '公关决策已执行，暂无待审批事项。' : '老板委派与合同审批流在 M1 后续步骤接入。'}</p>
       <footer><StatusTag tone="muted">建设中</StatusTag></footer>
     </SoftCard>
   </div>;

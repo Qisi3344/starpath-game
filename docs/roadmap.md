@@ -11,6 +11,15 @@
 
 ## M1：第一月核心闭环（优先）
 
+**开发顺序（见 [GLM 开工文档](dev/GLM-START-HERE.md)）：**
+B0 [#5 世界状态/日期/存档](https://github.com/Qisi3344/starpath-game/issues/5)
+→ B1 [#2 委派招募](https://github.com/Qisi3344/starpath-game/issues/2)
+→ B2 [#6 日程/通告/作品](https://github.com/Qisi3344/starpath-game/issues/6)
+→ B3 [#7 地图/手机/剧情联动](https://github.com/Qisi3344/starpath-game/issues/7)
+→ B4 [#8 C视觉和实机验收](https://github.com/Qisi3344/starpath-game/issues/8)。
+
+**注意：** 文档、类型和可点 UI 不算经营功能已完成；必须有真实状态变更及复现证据。
+
 - [ ] 数据驱动剧情引擎：对白、立绘、背景、姓名条、可条件化的选项、对话回看/自动/快进
 - [ ] **老板委派式新人招募（最小闭环）**：指定寻找方向 → 林知夏执行与进度 → 数日后汇报未签约候选人 → 查看资料 → 谈判/拒绝 → 玩家批准签约；与主日历/存档保持一致，详见 `docs/decisions/0003-ceo-delegation.md`
 - [ ] 一体化世界状态：日历、日程、艺人、作品、通告、资金、口碑、敌对度

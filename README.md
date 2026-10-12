@@ -15,9 +15,9 @@
 - `docs/decisions/0001-art-direction.md`：基于玩家反馈覆盖旧版第八章的**最新视觉决议**。
 - `docs/decisions/0002-characters-and-prologue.md`：开局角色关系和序章执行规则。
 - `docs/roadmap.md`：Alpha 0.1 开发阶段和验收条件。
-- **GLM 开工入口**：[\`docs/dev/GLM-START-HERE.md\`](docs/dev/GLM-START-HERE.md)：按 B0–B4 依赖顺序实施、提交和验收；不要重复开发 PR #4 已完成的 UI。
-- **状态与交互契约**：[\`docs/dev/m1-state-and-interaction-contract.md\`](docs/dev/m1-state-and-interaction-contract.md)：唯一游戏日、委派招募、通告、地图与手机联动、存档、测试。
-- **现状对账**：[\`docs/audits/2026-10-12-discussion-vs-code.md\`](docs/audits/2026-10-12-discussion-vs-code.md)：已确认设计与实际代码差距。
+- **GLM 开工入口**：[`docs/dev/GLM-START-HERE.md`](docs/dev/GLM-START-HERE.md)：按 B0–B4 依赖顺序实施、提交和验收；不要重复开发 PR #4 已完成的 UI。
+- **状态与交互契约**：[`docs/dev/m1-state-and-interaction-contract.md`](docs/dev/m1-state-and-interaction-contract.md)：唯一游戏日、委派招募、通告、地图与手机联动、存档、测试。
+- **现状对账**：[`docs/audits/2026-10-12-discussion-vs-code.md`](docs/audits/2026-10-12-discussion-vs-code.md)：已确认设计与实际代码差距。
 - `docs/ui/alpha-m1-interface-entry-plan.md`：**UI 开工蓝图（草案）**，历史 UI 蓝图；涉及旧导航选项的段落已被 ADR-0005 覆盖。
 - `docs/decisions/0005-navigation-and-global-entries.md`：**最终导航**工作室／艺人／娱乐圈／日程／通告；顶部手机与个人档案。
 - `docs/decisions/0004-final-visual-direction.md`：**唯一 C 方案**视觉定稿方向与全员黑白人物剪影占位规则。

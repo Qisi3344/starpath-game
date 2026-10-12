@@ -97,6 +97,7 @@ export type WorldCommand =
   | { type: 'SET_STORY_FLAG'; commandId: string; key: string; value?: boolean | number | string };
 
 export declare function dispatch(world: WorldState, command: WorldCommand): { world: WorldState; events: WorldEvent[] };
+export declare function foldCommands(world: WorldState, actions: Array<{ type: string; [k: string]: unknown }>, baseId: string): { world: WorldState; events: WorldEvent[] };
 
 export type SaveMeta = {
   slot: number;

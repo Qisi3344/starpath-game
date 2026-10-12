@@ -25,23 +25,57 @@ export function saveWorld(world, slot = 0, storage = defaultStorage()) {
   return describeSave(record, slot);
 }
 
+/** 深层结构校验：坏档统一可读报错，绝不静默清档，也绝不把坏状态推给界面（审查必修 4） */
+function validateWorld(world) {
+  if (typeof world !== 'object' || world === null || Array.isArray(world)) {
+    throw Error('存档的世界数据缺失或损坏');
+  }
+  const clock = world.clock;
+  if (typeof clock !== 'object' || clock === null
+    || !Number.isInteger(clock.absoluteDay) || clock.absoluteDay < 1
+    || !Number.isInteger(clock.year) || !Number.isInteger(clock.month) || !Number.isInteger(clock.day)) {
+    throw Error('存档的日期数据损坏，无法读取');
+  }
+  const company = world.company;
+  if (typeof company !== 'object' || company === null
+    || typeof company.name !== 'string'
+    || !Number.isInteger(company.cashMinor) || company.cashMinor < 0
+    || !Number.isInteger(company.reputation)) {
+    throw Error('存档的公司/资金数据损坏，无法读取');
+  }
+  for (const key of ['staff', 'artists', 'gigs', 'messages', 'events', 'places', 'works']) {
+    if (typeof world[key] !== 'object' || world[key] === null || Array.isArray(world[key])) {
+      throw Error('存档的 ' + key + ' 数据损坏，无法读取');
+    }
+  }
+  if (typeof world.story !== 'object' || world.story === null
+    || typeof world.story.flags !== 'object' || world.story.flags === null
+    || !Array.isArray(world.story.seenNodes)) {
+    throw Error('存档的剧情进度损坏，无法读取');
+  }
+  if (!Array.isArray(world.ledger) || !Array.isArray(world.processedActionIds)) {
+    throw Error('存档的账本数据损坏，无法读取');
+  }
+  if (typeof world.random !== 'object' || world.random === null || typeof world.random.seed !== 'string') {
+    throw Error('存档的随机种子损坏，无法读取');
+  }
+  parseRandomState(world.random.state); // 随机状态损坏尽早暴露
+}
+
 /** 读取：版本不符/结构损坏抛可读错误；调用方负责把错误展示给玩家 */
 export function loadWorld(slot = 0, storage = defaultStorage()) {
   const raw = storage.getItem(slotKey(slot));
   if (raw === null) throw Error('这个存档槽位还是空的');
   let record;
   try { record = JSON.parse(raw); } catch { throw Error('存档数据损坏，无法读取'); }
-  if (!record || typeof record !== 'object') throw Error('存档数据损坏，无法读取');
+  if (!record || typeof record !== 'object' || record.world === undefined) {
+    throw Error('存档数据损坏，无法读取');
+  }
   if (record.schemaVersion !== SCHEMA_VERSION) {
     throw Error('存档版本（v' + record.schemaVersion + '）与当前游戏（v' + SCHEMA_VERSION + '）不兼容');
   }
-  const world = record.world;
-  const required = ['clock', 'company', 'random', 'story', 'ledger', 'processedActionIds'];
-  for (const key of required) {
-    if (world[key] === undefined) throw Error('存档缺少 ' + key + ' 数据，无法读取');
-  }
-  parseRandomState(world.random.state); // 随机状态损坏尽早暴露
-  return { world, meta: describeSave(record, slot) };
+  validateWorld(record.world);
+  return { world: record.world, meta: describeSave(record, slot) };
 }
 
 export function describeSave(record, slot) {

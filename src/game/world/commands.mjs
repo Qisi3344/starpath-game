@@ -67,6 +67,23 @@ export function dispatch(world, command) {
   return { world: withId, events: result.events };
 }
 
+/**
+ * UI 操作层辅助（审查必修 2）：把一次交互产生的命令按序折叠进世界状态。
+ * 同一交互共享 baseId（子命令 -0/-1…），整组重放幂等；调用方必须"成功才提交"——
+ * 折叠中途抛错时丢弃返回值，调用方世界保持原引用，不产生半更新。
+ */
+export function foldCommands(world, actions, baseId) {
+  if (!Array.isArray(actions) || actions.length === 0) return { world, events: [] };
+  let s = world;
+  const events = [];
+  actions.forEach((a, i) => {
+    const r = dispatch(s, { ...a, commandId: baseId + '-' + i });
+    s = r.world;
+    events.push(...r.events);
+  });
+  return { world: s, events };
+}
+
 function runCommand(state, command) {
   switch (command.type) {
     case 'RENAME_COMPANY': return renameCompany(state, command);
@@ -165,9 +182,26 @@ function prDecide(state, command) {
 
 // ---- 日推进（契约第二节；B0 覆盖序章 7 天 + 自由推进到月末） ----
 
+/**
+ * 第一周主线门禁：推离某天前必须完成的关键节点（ADR-0002 序章节奏）。
+ * 未过门禁拒绝 ADVANCE_DAY，防止裸推日跳过剧情导致周结死局（审查必修 3）。
+ */
+const FIRST_WEEK_GATES = {
+  1: w => w.story.flags.luSigned === true || '陆星遥的签约还没有完成',
+  2: w => w.story.flags.prologueTrainDone === true || '今天的训练安排还没有决定',
+  3: w => w.story.flags.summerGigAccepted === true || '《夏日邻座》还没有回复对方',
+  5: w => w.story.flags.prChoice != null || '热搜危机还没有处理',
+  7: w => w.story.flags.firstWeekSettled === true || '第一周还没有结算',
+};
+
 function advanceDay(state) {
   if (state.pendingBlocker) {
     throw Error('有待处理的重要事件：' + state.pendingBlocker.title);
+  }
+  const gate = FIRST_WEEK_GATES[state.clock.absoluteDay];
+  if (gate) {
+    const verdict = gate(state);
+    if (verdict !== true) throw Error('今天还不能结束：' + verdict);
   }
   const events = [];
   const day = state.clock.absoluteDay;
@@ -253,7 +287,8 @@ function settleFirstWeek(state) {
   if (!gig || gig.status !== 'released') throw Error('第一周的通告尚未完成，不能结算');
   const gross = SUMMER_GIG.grossMinor;
   const platformFee = Math.round(gross * SUMMER_GIG.platformFeeRate);
-  const artistShare = Math.round(gross * SUMMER_GIG.artistShareRate);
+  // 分成基数 = 扣除平台费后的剩余收入（玩家确认口径）：(25 − 7.5) × 30% = 5.25 万
+  const artistShare = Math.round((gross - platformFee) * SUMMER_GIG.artistShareRate);
   const net = gross - platformFee - artistShare;
   if (net !== SUMMER_GIG.companyNetMinor) throw Error('分成计算与预期不符，拒绝入账');
 

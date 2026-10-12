@@ -1,6 +1,6 @@
 import {useReducer, useRef, useState} from 'react';
-import {newWorld, dispatch} from './game/world/world.mjs';
-import type {WorldState, WorldCommand, SaveMeta} from './game/world/world.d.mts';
+import {newWorld, foldCommands} from './game/world/world.mjs';
+import type {WorldState, SaveMeta} from './game/world/world.d.mts';
 import {formatWan, formatDateLabel} from './game/world/format.mjs';
 import {saveWorld, loadWorld, hasSave} from './game/world/save.mjs';
 import {initialNav, reduceNav} from './ui/navigation';
@@ -66,13 +66,21 @@ export default function App() {
   const [saveNote, setSaveNote] = useState('');
   const storyRef = useRef(story);
   storyRef.current = story;
+  // 同步引用：连续点击永远基于最新世界（防 React 批处理的丢失更新）；连点推日=有意连续推进多天
+  const worldRef = useRef(world);
 
-  const applyEnter = (idx: number, w: WorldState): WorldState => {
+  /** 执行一组世界命令：成功才提交（失败丢弃中间结果，无半更新）；每次交互一个 baseId，整组幂等可重放 */
+  const exec = (actions: {type: string; [k: string]: unknown}[]): WorldState => {
+    const base = commandId();
+    const {world: w2} = foldCommands(worldRef.current, actions, base);
+    worldRef.current = w2;
+    setWorld(w2);
+    return w2;
+  };
+
+  const applyEnter = (idx: number): WorldState => {
     const enter = PROLOGUE[idx].enter;
-    if (!enter) return w;
-    let s = w;
-    for (const a of enter) s = dispatch(s, {...a, commandId: commandId()} as WorldCommand).world;
-    return s;
+    return enter ? exec(enter) : worldRef.current;
   };
 
   const storyNext = () => {
@@ -80,9 +88,9 @@ export default function App() {
     const next = Math.min(story.idx + 1, PROLOGUE.length - 1);
     if (next === story.idx) return;
     try {
-      const w2 = applyEnter(next, world);
-      setWorld(w2);
+      const w2 = applyEnter(next);
       setStory({...story, idx: next, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[next].who, text: stepText(next, w2, story.mood)}]});
+      setError('');
     } catch (e) { setError(e instanceof Error ? e.message : '推进失败'); }
   };
 
@@ -94,13 +102,8 @@ export default function App() {
     if (res.curtain === 'resume' || res.curtain === 'contract') { setStory({...story, curtain: res.curtain}); return; }
     let w2 = world;
     try {
-      if (res.engine) {
-        let s = w2;
-        for (const a of res.engine) s = dispatch(s, {...a, commandId: commandId()} as WorldCommand).world;
-        w2 = s;
-      }
+      w2 = res.engine ? exec(res.engine) : world;
     } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); return; }
-    if (res.engine && w2 !== world) setWorld(w2);
     const mood = step.decision === 'mood' ? value : story.mood;
     if (res.curtain === 'settlement') { setStory({...story, mood, curtain: 'settlement'}); return; }
     setStory({...story, idx: res.next, mood, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[res.next].who, text: stepText(res.next, w2, mood)}]});
@@ -108,23 +111,19 @@ export default function App() {
 
   const storySkip = () => {
     let idx = story.idx;
-    let w2 = world;
     try {
       while (!PROLOGUE[idx].decision && idx < PROLOGUE.length - 1) {
         idx += 1;
-        const w3 = applyEnter(idx, w2);
-        if (w3 !== w2) w2 = w3;
+        applyEnter(idx);
       }
     } catch (e) { setError(e instanceof Error ? e.message : '跳转失败'); return; }
-    if (w2 !== world) setWorld(w2);
-    setStory({...story, idx, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[idx].who, text: stepText(idx, w2, story.mood)}]});
+    setStory({...story, idx, curtain: 'none', backlog: [...story.backlog, {who: PROLOGUE[idx].who, text: stepText(idx, worldRef.current, story.mood)}]});
   };
 
   // 命名确认 → 挂上新名牌（世界从开局就存在，这里只是命名）→ 进入"念名字"一步
   const storyName = (name: string) => {
     try {
-      const w2 = dispatch(world, {type: 'RENAME_COMPANY', commandId: commandId(), name}).world;
-      setWorld(w2);
+      const w2 = exec([{type: 'RENAME_COMPANY', name}]);
       setUnread(1);
       setStory(prev => ({...prev, idx: 6, curtain: 'none', backlog: [...prev.backlog, {who: PROLOGUE[6].who, text: stepText(6, w2, prev.mood)}]}));
     } catch (e) { setError(e instanceof Error ? e.message : '命名失败'); }
@@ -132,6 +131,7 @@ export default function App() {
 
   const storyRestart = () => {
     const w2 = newWorld('未命名工作室');
+    worldRef.current = w2;
     setWorld(w2);
     setError('');
     setSaveNote('');
@@ -142,7 +142,7 @@ export default function App() {
   // ---- 存读档（Issue #5）：档案浮层内的手动槽位 ----
   const onSave = () => {
     try {
-      const meta = saveWorld(world, 0);
+      const meta = saveWorld(worldRef.current, 0);
       setSaveInfo(meta);
       setSaveNote('已保存：' + meta.dateLabel + ' · ' + meta.company);
     } catch (e) { setSaveNote(e instanceof Error ? e.message : '保存失败'); }
@@ -150,6 +150,7 @@ export default function App() {
   const onLoad = () => {
     try {
       const {world: w2, meta} = loadWorld(0);
+      worldRef.current = w2;
       setWorld(w2);
       setSaveInfo(meta);
       setSaveNote('已读取：' + meta.dateLabel);
@@ -170,8 +171,7 @@ export default function App() {
   /** 自由期推日（第一周结算后）：契约第二节的统一推日入口 */
   const advanceDay = () => {
     try {
-      const w2 = dispatch(world, {type: 'ADVANCE_DAY', commandId: commandId()}).world;
-      setWorld(w2);
+      exec([{type: 'ADVANCE_DAY'}]);
       setError('');
     } catch (e) { setError(e instanceof Error ? e.message : '推进失败'); }
   };

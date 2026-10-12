@@ -41,8 +41,10 @@ export const SUMMER_GIG = {
   category: '新人生活观察综艺',
   grossMinor: wanToMinor(25),
   platformFeeRate: 0.3,
-  // 艺人分成 21%：与旧第一周引擎一致（25 − 7.5 − 5.25 = 12.25 净额；V0.2 文案写 30% 是笔误）
-  artistShareRate: 0.21,
+  // 分成口径（2026-10-12 玩家确认，记入 M1 契约）：平台抽合同总额 30%；
+  // 艺人分成基数 = 扣除平台费后的剩余收入，比例 30% → 25 − 7.5 = 17.5，17.5 × 30% = 5.25 万。
+  artistShareRate: 0.3,
+  artistShareBase: 'after_platform_fee',
   companyNetMinor: wanToMinor(12.25), // 首次竞标保底（V1.6.2 新手规则）
   days: 3,
 };

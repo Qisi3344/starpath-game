@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newWorld, wanToMinor, CHARACTER_IDS } from '../src/game/world/state.mjs';
-import { dispatch } from '../src/game/world/commands.mjs';
+import { dispatch, foldCommands } from '../src/game/world/commands.mjs';
 import { createRandomState, serializeRandomState, nextFloat, parseRandomState } from '../src/game/world/random.mjs';
 import { saveWorld, loadWorld, hasSave, deleteSave } from '../src/game/world/save.mjs';
 import { formatWan } from '../src/game/world/format.mjs';
@@ -48,9 +48,90 @@ test('W01 签约：第 1 天签陆星遥入 roster，重复确认不签两次', 
 
 test('W01 签约只能在第 1 天（剧情特殊入口不进人才池）', () => {
   let w = newWorld();
+  // 未签约时主线门禁拒绝推日（审查必修 3）
+  assert.throws(() => dispatch(w, cmd('ADVANCE_DAY')), /签约还没有完成/);
+  w = dispatch(w, cmd('SIGN_LU')).world;
   w = dispatch(w, cmd('ADVANCE_DAY')).world;
   assert.throws(() => dispatch(w, cmd('SIGN_LU')), /只能在第 1 天/);
   assert.equal(w.candidatePool && Object.keys(w.candidatePool).length, 0);
+});
+
+test('必修3 主线门禁：Day7 未结算不能推到 Day8（避免周结死局）', () => {
+  let w = playFirstWeek();
+  // 重放结算幂等后仍处于已结算态；未结算路径：走到 day7 但跳过结算
+  let w2 = newWorld('星芒事务所', 'seed-fixed');
+  let n = 0;
+  const step = (type, extra = {}) => { const r = dispatch(w2, { type, commandId: 'gate-' + (++n), ...extra }); w2 = r.world; return r; };
+  step('RENAME_COMPANY', { name: '星芒事务所' });
+  step('SIGN_LU');
+  step('ADVANCE_DAY');
+  step('PROLOGUE_TRAIN', { train: true });
+  step('ADVANCE_DAY');
+  step('ACCEPT_SUMMER_GIG');
+  step('ADVANCE_DAY');
+  step('ADVANCE_DAY');
+  step('PR_DECIDE', { method: 'statement' });
+  step('ADVANCE_DAY');
+  step('ADVANCE_DAY'); // 现在 day7，未结算
+  assert.equal(w2.clock.absoluteDay, 7);
+  assert.throws(() => dispatch(w2, cmd('ADVANCE_DAY')), /第一周还没有结算/);
+  // 结算后门禁放行
+  w2 = dispatch(w2, cmd('SETTLE_FIRST_WEEK')).world;
+  w2 = dispatch(w2, cmd('ADVANCE_DAY')).world;
+  assert.equal(w2.clock.absoluteDay, 8);
+  // day8+ 自由期无门禁：连续推进不抛错
+  w2 = dispatch(w2, cmd('ADVANCE_DAY')).world;
+  assert.equal(w2.clock.absoluteDay, 9);
+});
+
+test('必修2 操作层：foldCommands 连发命令串行生效，同 baseId 整组幂等，中途失败无半更新', () => {
+  const w = playFirstWeek(); // day7 已结算
+  // 连发两天推日（受控重入场景：连点=有意连推多天）
+  const r1 = foldCommands(w, [{ type: 'ADVANCE_DAY' }, { type: 'ADVANCE_DAY' }], 'fc-1');
+  assert.equal(r1.world.clock.absoluteDay, 9);
+  // 同 baseId 整组重放（在已执行后的世界 state 上）→ 幂等
+  const r2 = foldCommands(r1.world, [{ type: 'ADVANCE_DAY' }, { type: 'ADVANCE_DAY' }], 'fc-1');
+  assert.equal(r2.world, r1.world);
+  assert.equal(r2.events.length, 0);
+  // 中途抛错可被调用方捕获（SIGN_LU 在自由期非法）
+  assert.throws(() => foldCommands(r1.world, [{ type: 'ADVANCE_DAY' }, { type: 'SIGN_LU' }], 'fc-bad'), /只能在第 1 天/);
+  // 调用方"成功才提交"：丢弃返回值 → 原世界引用与状态不变（无半更新、无已执行记录）
+  assert.equal(w.clock.absoluteDay, 7);
+  assert.equal(w.processedActionIds.some(id => id.startsWith('fc-bad')), false);
+});
+
+test('必修4 坏档深层校验：world/clock 为 null 或类型错误时给出可读错误', () => {
+  const storage = (() => { const m = new Map(); return {
+    getItem: k => m.has(k) ? m.get(k) : null,
+    setItem: (k, v) => m.set(k, v),
+    removeItem: k => m.delete(k),
+  }; })();
+  const mk = world => JSON.stringify({ schemaVersion: 1, savedAtRealTime: new Date().toISOString(), world });
+  storage.setItem('starpath.save.v1.slot0', mk(null));
+  assert.throws(() => loadWorld(0, storage), /世界数据缺失或损坏/);
+  storage.setItem('starpath.save.v1.slot0', mk({ ...newWorld(), clock: null }));
+  assert.throws(() => loadWorld(0, storage), /日期数据损坏/);
+  storage.setItem('starpath.save.v1.slot0', mk({ ...newWorld(), clock: { year: 1, month: 1, day: 1, absoluteDay: 'x' } }));
+  assert.throws(() => loadWorld(0, storage), /日期数据损坏/);
+  storage.setItem('starpath.save.v1.slot0', mk({ ...newWorld(), company: { name: 'x', cashMinor: -5, reputation: 45 } }));
+  assert.throws(() => loadWorld(0, storage), /公司\/资金数据损坏/);
+  storage.setItem('starpath.save.v1.slot0', mk({ ...newWorld(), artists: 'not-an-object' }));
+  assert.throws(() => loadWorld(0, storage), /artists 数据损坏/);
+  // 好档不受影响
+  storage.setItem('starpath.save.v1.slot0', mk(newWorld()));
+  const ok = loadWorld(0, storage);
+  assert.equal(ok.world.schemaVersion, 1);
+});
+
+test('必修1 分成基数：艺人分成 = 扣平台费后剩余收入的 30%，含舍入校验', () => {
+  const w = playFirstWeek();
+  const gigLines = w.ledger.filter(e => e.category === 'gig' || e.category === 'platform_fee' || e.category === 'artist_share');
+  const byCat = Object.fromEntries(gigLines.map(e => [e.category, e.amountMinor]));
+  assert.equal(byCat.gig, 250000);           // 总额 25 万
+  assert.equal(byCat.platform_fee, 75000);   // 平台 30% × 25 万 = 7.5 万
+  assert.equal(byCat.artist_share, 52500);   // (25 − 7.5) × 30% = 5.25 万（基数是扣平台费后）
+  const net = byCat.gig - byCat.platform_fee - byCat.artist_share;
+  assert.equal(net, 122500);                 // 公司净额 12.25 万
 });
 
 test('W02 资金：200 万初始化，训练/律师费扣一次，通告净额对账', () => {

@@ -15,12 +15,13 @@
 - `docs/decisions/0001-art-direction.md`：基于玩家反馈覆盖旧版第八章的**最新视觉决议**。
 - `docs/decisions/0002-characters-and-prologue.md`：开局角色关系和序章执行规则。
 - `docs/roadmap.md`：Alpha 0.1 开发阶段和验收条件。
-- `docs/ui/alpha-m1-interface-entry-plan.md`：**UI 开工蓝图（草案）**，含首月流程与组件清单；旧导航备选已归档。
+- **GLM 开工入口**：[`docs/dev/GLM-START-HERE.md`](docs/dev/GLM-START-HERE.md)：按 B0–B4 依赖顺序实施、提交和验收；不要重复开发 PR #4 已完成的 UI。
+- **状态与交互契约**：[`docs/dev/m1-state-and-interaction-contract.md`](docs/dev/m1-state-and-interaction-contract.md)：唯一游戏日、委派招募、通告、地图与手机联动、存档、测试。
+- **现状对账**：[`docs/audits/2026-10-12-discussion-vs-code.md`](docs/audits/2026-10-12-discussion-vs-code.md)：已确认设计与实际代码差距。
+- `docs/ui/alpha-m1-interface-entry-plan.md`：**UI 开工蓝图（草案）**，历史 UI 蓝图；涉及旧导航选项的段落已被 ADR-0005 覆盖。
 - `docs/decisions/0005-navigation-and-global-entries.md`：**最终导航**工作室／艺人／娱乐圈／日程／通告；顶部手机与个人档案。
 - `docs/decisions/0004-final-visual-direction.md`：**唯一 C 方案**视觉定稿方向与全员黑白人物剪影占位规则。
-- `docs/ui/industry-map-navigation-research.md`：对比同类明星经营游戏，提出地图应承担的资源/势力/员工外派用途，导航已由 ADR-0005 确认。
-- `docs/ui/m1-page-tree.md`：开发版**已确认五 Tab 页面树与返回链**。
-- `docs/ui/art-direction-a-visual-spec.md`：落选 A 方案历史对照（不是第二套主题）。
+- `docs/ui/industry-map-navigation-research.md`：同类经营游戏地图调研；导航已由 ADR-0005 定稿。
 - `docs/decisions/0003-ceo-delegation.md`：**玩家是公司老板**，委派员工寻找/接洽新艺人、汇报候选人，玩家批准合同与重大经营决策。
 - `docs/design/artist-career-and-emergent-stories.md`：艺人职业路线、作品履历与经营过程生成的故事（分阶段开发草案）。
 - `prototypes/galgame-v0.2.html`：**可直接用浏览器打开试玩**的 V0.2 Galgame 交互原型（设计参考，尚非 React 正式引擎）。
@@ -69,4 +70,4 @@ npm run build
 原始制作包与试玩原型仅作为本项目内部开发资料。项目坚持**原创视觉识别与交互实现**：不得直接复制第三方游戏的 UI 布局、角色、素材、音效、动画或受保护的设计资源。用户希望的只是柔和精致的女性向界面氛围，并未指定任何游戏作为开发模板。
 
 正式立绘、场景、美术授权和发行方式待确定，仓库建议保持 Private。
-> **当前 PR #4**：可点击的五 Tab 导航、娱乐圈地图分区、个人档案与手机浮层、Galgame 剧情播放器；完整自由经营月与员工委派尚在开发中。
+> **当前 PR #4：** 统一 C 视觉的五 Tab UI 壳和地图详情仍待手动验收，未合并到 main。实际业务执行按 `docs/dev/GLM-START-HERE.md` 的 B0–B4 推进。

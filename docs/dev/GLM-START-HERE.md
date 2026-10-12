@@ -94,4 +94,15 @@
 - **验证**：自动测试结果、浏览器截图、关键交互路径、存读档复现。
 - **需要玩家确认**：只提真正影响创作/经营设定的开放问题；不要把已拍板的 UI 导航/风格重新当成问卷。
 
+## 6. 已拆成可领取任务
+
+- B0 [#5 世界状态、游戏日与存读档](https://github.com/Qisi3344/starpath-game/issues/5)（先做）
+- B1 [#2 老板委派式新人招募](https://github.com/Qisi3344/starpath-game/issues/2)（依赖 B0）
+- B2 [#6 日程、通告、作品履历](https://github.com/Qisi3344/starpath-game/issues/6)（依赖 B0，配合 B1）
+- B3 [#7 地图、手机与剧情联动](https://github.com/Qisi3344/starpath-game/issues/7)（依赖 B0/B1/B2）
+- B4 [#8 C视觉、剪影与实机验收](https://github.com/Qisi3344/starpath-game/issues/8)（最终验收；UI 可提前同步调整）
+- 主里程碑 #1；现有 UI PR #4。
+
+**C 效果图资产提示**：制作人的当前对话中已有正式选定的 C 六屏原图，但此图仍**没有上传到 GitHub**。仓库 `docs/ui/mockups/` 仅有旧 A 图；接到原图前不要把 A 当作 C，也不可虚报素材已就位。
+
 当前必看主里程碑：[#1](https://github.com/Qisi3344/starpath-game/issues/1)，委派招募：[#2](https://github.com/Qisi3344/starpath-game/issues/2)，UI/导航：[#3](https://github.com/Qisi3344/starpath-game/issues/3)，进行中的界面 PR：[#4](https://github.com/Qisi3344/starpath-game/pull/4)。

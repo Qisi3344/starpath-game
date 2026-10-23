@@ -256,3 +256,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-prim
 .candidate-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .candidate-actions .btn-primary, .candidate-actions .btn-ghost { flex:1 1 30%; padding:9px 6px; font-size:11px; min-height:38px; }
 .candidate-card footer { margin-top:8px; }
+
+/* —— B2/M3：疲劳、证据、事件卡、结局 —— */
+.fatigue-bar { height: 6px; background: #efe3e2; border-radius: 4px; overflow: hidden; margin: 6px 0 10px; }
+.fatigue-fill { height: 100%; transition: width .4s, background .4s; }
+.evidence-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.evidence-chip { font-size: 10px; padding: 5px 9px; border-radius: 999px; border: 1px solid #dbc7ce; color: #a68494; }
+.evidence-chip.got { border-color: #4f8a5a; color: #3d6b48; background: #eaf4ec; }
+.ending-sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 40%, #16100e, #000 75%); }
+.ending-box { max-width: 520px; padding: 30px; text-align: center; }
+.ending-box small { font-size: 10px; letter-spacing: .5em; color: #6f7d72; }
+.ending-box h1 { font-weight: 400; font-size: 26px; letter-spacing: .2em; color: #e8dfc6; margin: 14px 0; }
+.ending-box p { color: #a89a8a; font-size: 14px; line-height: 2.1; margin: 14px 0; text-align: justify; }
+.ending-meta { font-size: 11px; color: #6f6355 !important; text-align: center !important; }

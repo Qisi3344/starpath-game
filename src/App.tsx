@@ -191,6 +191,23 @@ export default function App() {
       setUnread(1);
     } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); }
   };
+  // ---- B2 / M2 / M3：培养排期、通告竞标、公司运营、选秀与复仇线 ----
+  const run = (actions: {type: string; [k: string]: unknown}[], note: string) => {
+    try {
+      exec(actions);
+      setError('');
+      setUnread(1);
+    } catch (e) { setError(e instanceof Error ? e.message : note); }
+  };
+  const onTrain = (artistId: string, tier: string, days: number) => run([{type: 'START_TRAINING', artistId, tier, days}], '排期失败');
+  const onRest = (artistId: string, days: number) => run([{type: 'START_REST', artistId, days}], '排期失败');
+  const onBid = (gigId: string, artistId: string, bribeMinor: number) => run([{type: 'BID_GIG', gigId, artistId, bribeMinor}], '竞标失败');
+  const onSignYichen = () => run([{type: 'SIGN_YICHEN'}], '签约失败');
+  const onSuppress = () => run([{type: 'SUPPRESS_SMEAR'}], '压制失败');
+  const onFestSignup = (artistId: string) => run([{type: 'FESTIVAL_SIGNUP', artistId}], '报名失败');
+  const onFestBoost = (boostId: string) => run([{type: 'FESTIVAL_BOOST', boostId}], '打榜失败');
+  const onInvest = () => run([{type: 'START_INVESTIGATION'}], '调查发起失败');
+  const onFinale = (choice: string) => run([{type: 'RESOLVE_FINALE', choice}], '抉择失败');
 
   const overlay = nav.overlay === 'story'
     ? <StoryPlayer story={story} world={world}
@@ -225,12 +242,26 @@ export default function App() {
     switch (nav.tab) {
       case 'map': return <MapPage onOpenDistrict={id => dispatchNav({type: 'PUSH', page: 'district:' + id})}/>;
       case 'company': return <CompanyPage world={world} error={error} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})} onRestart={storyRestart} onAdvanceDay={advanceDay}
-        onStartScout={onStartScout} onInterview={onCandidate('INTERVIEW_CANDIDATE')} onSign={onCandidate('SIGN_CANDIDATE')} onReject={onCandidate('REJECT_CANDIDATE')}/>;
+        onStartScout={onStartScout} onInterview={onCandidate('INTERVIEW_CANDIDATE')} onSign={onCandidate('SIGN_CANDIDATE')} onReject={onCandidate('REJECT_CANDIDATE')}
+        onSignYichen={onSignYichen} onInvest={onInvest} onSuppress={onSuppress} onFinale={onFinale}/>;
       case 'artists': return <ArtistsPage world={world}/>;
-      case 'schedule': return <SchedulePage world={world} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})}/>;
-      case 'gigs': return <GigsPage world={world}/>;
+      case 'schedule': return <SchedulePage world={world} onTrain={onTrain} onRest={onRest} onFestSignup={onFestSignup} error={error}/>;
+      case 'gigs': return <GigsPage world={world} onBid={onBid} error={error} onFestBoost={onFestBoost}/>;
     }
   };
+
+  const ending = world.ending;
+  const endingOverlay = ending
+    ? <div className="ending-sheet" role="dialog" aria-label={ending.title}>
+        <div className="ending-box">
+          <small>CHAPTER FIN</small>
+          <h1>{ending.title}</h1>
+          <p>{ending.body}</p>
+          <p className="ending-meta">{formatDateLabel(world.clock)} · 深度 {Object.keys(world.works).length} 部作品 · {world.company.name}</p>
+          <button className="btn-primary" onClick={storyRestart}>重 走 星 途</button>
+        </div>
+      </div>
+    : undefined;
 
   return <GameShell
     resource={{dateLabel: formatDateLabel(world.clock), money: formatWan(world.company.cashMinor), reputation: world.company.reputation}}
@@ -239,8 +270,8 @@ export default function App() {
     onOpenProfile={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'profile'})}
     activeTab={nav.tab}
     onSwitchTab={tab => dispatchNav({type: 'SWITCH_TAB', tab})}
-    chromeHidden={nav.overlay === 'story'}
-    overlay={overlay}>
+    chromeHidden={nav.overlay === 'story' || !!ending}
+    overlay={<>{endingOverlay}{overlay}</>}>
     {renderTab()}
   </GameShell>;
 }

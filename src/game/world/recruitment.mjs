@@ -7,6 +7,7 @@
 
 import { MINOR_PER_WAN, CHARACTER_IDS, messageId, pushMessage, ledgerEntryId } from './state.mjs';
 import { nextFloat, serializeRandomState } from './random.mjs';
+import { settleInvestigation } from './revenge.mjs';
 
 const wan = n => Math.round(n * MINOR_PER_WAN);
 
@@ -111,6 +112,14 @@ export function advanceRecruitment(state, events) {
   // 1) 到期任务结算
   for (const task of Object.values(next.recruitment)) {
     if (task.status !== 'active' || day < task.dueDay) continue;
+    if (task.isInvestigation) {
+      // 复仇线：秘密调查的成功/失败与敌对升档
+      next = { ...next, recruitment: { ...next.recruitment, [task.id]: { ...task, status: 'done', result: [] } } };
+      const invStaff = next.staff[task.ownerId];
+      if (invStaff) next = { ...next, staff: { ...next.staff, [task.ownerId]: { ...invStaff, capacity: { ...invStaff.capacity, used: Math.max(0, invStaff.capacity.used - 1) } } } };
+      next = settleInvestigation(next, task, events, rand);
+      continue;
+    }
     const count = rollCandidateCount(rand);
     const made = [];
     for (let i = 0; i < count; i++) {

@@ -12,6 +12,11 @@ import {
 } from './state.mjs';
 import { nextFloat, serializeRandomState } from './random.mjs';
 import { advanceRecruitment, startScouting, interviewCandidate, signCandidate, rejectCandidate } from './recruitment.mjs';
+import { startTraining, startRest, advanceSchedules, ensureCareerFields } from './career.mjs';
+import { refreshMarket, bidGig, advanceGigs } from './gigs.mjs';
+import { advanceCompany, advanceHostility, suppressSmear } from './company.mjs';
+import { advanceFestival, signupFestival, boostFestival } from './festival.mjs';
+import { startInvestigation, checkFinale, checkBankruptcy, resolveFinale } from './revenge.mjs';
 
 const wan = n => Math.round(n * MINOR_PER_WAN);
 
@@ -98,6 +103,15 @@ function runCommand(state, command) {
     case 'INTERVIEW_CANDIDATE': return interviewCandidate(state, command);
     case 'SIGN_CANDIDATE': return signCandidate(state, command);
     case 'REJECT_CANDIDATE': return rejectCandidate(state, command);
+    case 'START_TRAINING': return startTraining(state, command);
+    case 'START_REST': return startRest(state, command);
+    case 'BID_GIG': return bidGig(state, command);
+    case 'SIGN_YICHEN': return signYichen(state);
+    case 'SUPPRESS_SMEAR': return suppressSmear(state, command);
+    case 'FESTIVAL_SIGNUP': return signupFestival(state, command);
+    case 'FESTIVAL_BOOST': return boostFestival(state, command);
+    case 'START_INVESTIGATION': return startInvestigation(state, command);
+    case 'RESOLVE_FINALE': return resolveFinale(state, command);
     case 'SET_STORY_FLAG': {
       // 剧情标记（如序章心境 mood）：进存档，读档后剧情文案可复现
       if (typeof command.key !== 'string' || command.key.length === 0) throw Error('缺少剧情标记名');
@@ -128,6 +142,8 @@ function signLu(state) {
     availability: 'idle',
     history: [],
     growthGoal: '全能偶像',
+    fatigue: 0,
+    salaryMinor: wan(0.5),
   };
   let next = { ...state, artists: { ...state.artists, [CHARACTER_IDS.lu]: lu } };
   next = withFlag(next, 'luSigned', true);
@@ -240,6 +256,27 @@ function advanceDay(state) {
   const recruit = advanceRecruitment(next, events);
   next = recruit.world;
 
+  // 4.5 排期推进：训练成长 / 休息恢复（B2），通告录制与结算（B2）
+  const sched = advanceSchedules(next, events);
+  next = sched.world;
+  const gigTick = advanceGigs(next, events);
+  next = gigTick.world;
+
+  // 4.6 选秀推进（M3）
+  const festR = { rand: null };
+  const festRoll = nextFloat(next.random.state);
+  next = { ...next, random: { ...next.random, state: serializeRandomState(festRoll.state) } };
+  festR.rand = () => nextFloat(next.random.state).value;   // 选秀内部用世界随机
+  const fest = advanceFestival(next, events, () => nextFloat(next.random.state).value);
+  // advanceFestival 内部自行写回随机状态，忽略这里的包装
+  next = fest.world;
+
+  // 4.7 星煌黑稿（M3，敌对 ≥2 时每月 12 日）
+  const smearRoll = nextFloat(next.random.state);
+  next = { ...next, random: { ...next.random, state: serializeRandomState(smearRoll.state) } };
+  const smear = advanceHostility(next, events, smearRoll);
+  next = smear.world;
+
   // 5. 持久化随机数驱动的世界脉搏（每次推进恰好消耗 1 个随机数，保证读档重放一致）
   const roll = nextFloat(next.random.state);
   next = { ...next, random: { ...next.random, state: serializeRandomState(roll.state) } };
@@ -269,13 +306,75 @@ function advanceDay(state) {
     const closed = recordEvent(next, 'month_close_' + next.clock.year + '_' + next.clock.month, { type: 'monthlyClose', netMinor: monthNet });
     next = closed;
     events.push({ type: 'monthlyClosed', month: next.clock.month, netMinor: monthNet });
+    // M2：月薪 / 运营 / 等级晋升 / 赤字计数
+    const comp = advanceCompany(next, events);
+    next = comp.world;
+    // M3：终章检查（三证集齐 → 挂抉择）与破产结局
+    const finale = checkFinale(next, events);
+    next = finale.world;
+    const broke = checkBankruptcy(next, events);
+    next = broke.world;
   }
 
   // 6. 全部变更校验成功后才推进时钟
   const absoluteDay = day + 1;
   next = { ...next, clock: clockFromAbsolute(absoluteDay) };
   events.push({ type: 'dayAdvanced', absoluteDay });
+
+  // 6.5 剧情事件：沈亦辰第二个月上门（ADR-0002，进入第 2 个月的第一次推日）
+  if (!next.story.flags.yichenArrived && absoluteDay >= 31 && !next.pendingBlocker) {
+    next = { ...next, pendingBlocker: { title: '楼下有人找你，说是故人', kind: 'yichen' }, story: { ...next.story, flags: { ...next.story.flags, yichenArrived: true } } };
+    next = pushMessage(next, {
+      id: messageId(next, 'yichen_here'),
+      from: '前台',
+      level: 'warn',
+      title: '楼下有人找',
+      body: '一位自称沈亦辰的演员在大堂等了很久。她说——「告诉她，正艺传媒的戏我推了。」',
+      absoluteDay,
+    });
+    events.push({ type: 'yichenArrived' });
+  }
+
+  // 7. 每月 1 日刷新通告市场（B2）
+  if (absoluteDay % DAYS_PER_MONTH === 1) {
+    const mRoll = nextFloat(next.random.state);
+    next = { ...next, random: { ...next.random, state: serializeRandomState(mRoll.state) } };
+    const market = refreshMarket(next, events, () => nextFloat(next.random.state).value);
+    next = market.world;
+  }
   return { world: next, events };
+}
+
+/** 第 2 个月的故人：沈亦辰剧情加盟（ADR-0002，特殊入口不进人才池） */
+function signYichen(state) {
+  if (!state.pendingBlocker || state.pendingBlocker.kind !== 'yichen') throw Error('沈亦辰还没有上门');
+  if (state.artists[CHARACTER_IDS.yichen]) throw Error('沈亦辰已在旗下');
+  const yc = ensureCareerFields({
+    id: CHARACTER_IDS.yichen,
+    name: '沈亦辰',
+    track: 'actor',
+    grade: 'B',
+    stats: { performance: 72, appearance: 78, appeal: 55 },
+    fans: 45000,
+    availability: 'idle',
+    history: [{ date: state.clock, note: '推掉正艺传媒的戏，来投你的工作室' }],
+    growthGoal: '国民度演员',
+  }, 'B');
+  let next = { ...state, artists: { ...state.artists, [CHARACTER_IDS.yichen]: yc } };
+  next = {
+    ...next,
+    pendingBlocker: null,
+    events: { ...next.events, ['sign_yichen']: { id: 'sign_yichen', absoluteDay: state.clock.absoluteDay, type: 'signing' } },
+  };
+  next = pushMessage(next, {
+    id: messageId(next, 'yichen_sign'),
+    from: '沈亦辰',
+    level: 'summary',
+    title: '签约 · 沈亦辰',
+    body: '「正艺给的是女主，你给的是翻身。我赌你。」B 级演员入队，月薪 8 万，档期从今天开始算。',
+    absoluteDay: state.clock.absoluteDay,
+  });
+  return { world: next, events: [{ type: 'artistSigned', artistId: CHARACTER_IDS.yichen }] };
 }
 
 function monthlyNetMinor(state) {

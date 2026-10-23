@@ -2,7 +2,7 @@ import {CharacterPlaceholder} from '../story/CharacterPlaceholder';
 import {PageHeader, SoftCard, StatusTag, EmptyState, StatLine, PrimaryButton, GhostButton} from '../ui/components';
 import type {WorldState, SaveMeta, Candidate, RecruitmentTask} from '../game/world/world.d.mts';
 import {formatWan} from '../game/world/format.mjs';
-import {SCOUT_TRACKS} from '../game/world/recruitment.mjs';
+import {SCOUT_TRACKS, TRAIN_TIERS, BOOSTS, EVIDENCE_KEYS, EVIDENCE_INFO, bidScore} from '../game/world/recruitment-exports.mjs';
 import {INDUSTRY_DISTRICTS, type DistrictId} from '../game/industry-districts';
 
 /*
@@ -49,34 +49,56 @@ export function DistrictPage({districtId, onBack}: {districtId: DistrictId; onBa
   </div>;
 }
 
-export function SchedulePage({world, onContinueStory}: {world: WorldState; onContinueStory: () => void}) {
-  const day = world.clock.absoluteDay;
-  const f = world.story.flags;
-  const inFirstWeek = day <= 7;
-  const schedule = f.firstWeekSettled ? '第一周已结算。第二个月的日程安排将在委派与通告系统接入后开放。'
-    : !f.luSigned ? '等待陆星遥签约。'
-    : day === 2 ? '陆星遥今日可安排唱跳培训，决策仍在序章剧情中进行。'
-    : day === 3 ? '《夏日邻座》正在等待你的通告决定。'
-    : day >= 4 && day <= 6 ? '陆星遥正在参与综艺录制。'
-    : day === 5 ? '星煌舆情事件，等待老板选择公关方案。'
-    : '经纪人正在整理本周通告和财务资料。';
+export function SchedulePage({world, onTrain, onRest, onFestSignup, error}: {
+  world: WorldState;
+  onTrain: (artistId: string, tier: string, days: number) => void;
+  onRest: (artistId: string, days: number) => void;
+  onFestSignup: (artistId: string) => void;
+  error: string;
+}) {
+  const artists = Object.values(world.artists);
+  const today = world.clock.absoluteDay;
+  const upcoming = Object.values(world.schedules).filter(s => s.status !== 'done' && s.status !== 'cancelled' && s.startDay + s.days > today);
+  const fest = world.festival;
+  const artistsRecord = world.artists as Record<string, {id: string; name?: string; grade?: string; track?: string; fatigue?: number; stats?: Record<string, number>}>;
   return <div className="page">
-    <PageHeader title="日程" subtitle="SCHEDULE · 艺人培养与员工委派"/>
-    <SoftCard tag="第1年 · 第1月" title={`第 ${world.clock.day} 日的安排`}>
-      <div className="week-strip" aria-label="第一周游戏日">
-        {[1,2,3,4,5,6,7].map(n =>
-          <span key={n} className={`week-day${inFirstWeek && world.clock.day === n ? ' is-current' : ''}${f.firstWeekSettled || world.clock.day > n ? ' is-past' : ''}`}>{n}日</span>)}
+    <PageHeader title="日程" subtitle="SCHEDULE · 培养与档期"/>
+    {fest?.status === 'signup' && <SoftCard tag="限时 · 青柠新星季" title="选秀报名窗口开启">
+      <p>报名费 5 万，三阶段角逐（初选 → 公演 → 决赛），冠军奖金 10 万、人气口碑双收。选一位艺人参赛。</p>
+      <div className="track-picker">
+        {artists.map(a => <button key={a.id} type="button" className="track-option" onClick={() => onFestSignup(a.id)} aria-label={'报名' + a.name}>
+          <strong>{a.name}</strong><small>{a.grade} 级 · 人气 {a.fans.toLocaleString()}</small>
+        </button>)}
       </div>
-      <p>{schedule}</p>
-      {inFirstWeek && !f.firstWeekSettled && <footer><PrimaryButton onClick={onContinueStory}>回到剧情处理当前任务 →</PrimaryButton></footer>}
-    </SoftCard>
-    <SoftCard tag="助理与星探" title="委派任务">
-      <p>正式版中你可以安排林知夏执行新人寻访和商务接洽；当前没有已运行的派遣任务。</p>
-      <footer><StatusTag tone="muted">委派引擎接入 M1 后续阶段（B1）</StatusTag></footer>
-    </SoftCard>
-    <SoftCard tag="档期" title="跨艺人排期">
-      <p>未来可在这里查看、调整通告、培养与外派的时间冲突。现在不伪造空档或完成结果。</p>
-    </SoftCard>
+    </SoftCard>}
+    {fest?.status === 'running' && <SoftCard tag="青柠新星季 · 进行中" title={`第 ${fest.stage}/3 阶段`}>
+      <p>{(fest.artistId ? artistsRecord[fest.artistId]?.name : '') ?? '艺人'} 正在参赛。打榜记录：{fest.boosts.map(b => '第' + b + '阶段').join('、') || '尚未打榜'}</p>
+    </SoftCard>}
+    {artists.length === 0
+      ? <EmptyState icon="♧" title="还没有艺人" note="签约第一位艺人后，这里就是她的行程表。"/>
+      : artists.map(a => {
+          const fatigue = a.fatigue ?? 0;
+          const busy = upcoming.find(s => s.assigneeId === a.id);
+          return <SoftCard key={a.id} tag={`${a.grade} 级 · 疲劳 ${fatigue}`} title={a.name}>
+            <div className="fatigue-bar"><div className="fatigue-fill" style={{width: fatigue + '%', background: fatigue > 70 ? '#a3221a' : fatigue > 40 ? '#b07a2a' : '#3f5a2c'}}/></div>
+            {busy
+              ? <p>第 {busy.startDay}–{busy.startDay + busy.days - 1} 日：{busy.kind === 'training' ? '特训（' + (TRAIN_TIERS[busy.linkedId]?.label ?? busy.linkedId) + '）' : '休息'}</p>
+              : <div className="track-picker">
+                  {Object.entries(TRAIN_TIERS).map(([k, v]: [string, {costPerDayMinor: number; gain: number; label: string}]) =>
+                    <button key={k} type="button" className="track-option" onClick={() => onTrain(a.id, k, 3)} disabled={fatigue >= 85}
+                      aria-label={'用' + v.label + '训练3天'}>
+                      <strong>{v.label} × 3 天</strong><small>{v.costPerDayMinor / 10000} 万/天 · 主能力 +{v.gain}/天</small>
+                    </button>)}
+                  <button type="button" className="track-option" onClick={() => onRest(a.id, 2)} aria-label="休息2天">
+                    <strong>休息 × 2 天</strong><small>恢复 15 疲劳/天 · 免费</small>
+                  </button>
+                </div>}
+          </SoftCard>;
+        })}
+    {upcoming.length > 0 && <SoftCard tag="档期总览" title={`未来 ${upcoming.length} 项安排`}>
+      {upcoming.map(s => <StatLine key={s.id} label={`${(artistsRecord[s.assigneeId] as {name?: string})?.name ?? s.assigneeId} · 第 ${s.startDay}–${s.startDay + s.days - 1} 日`} value={s.kind === 'training' ? '特训' : '休息'}/>)}
+    </SoftCard>}
+    {error && <div role="alert" className="error">{error}</div>}
   </div>;
 }
 
@@ -159,7 +181,7 @@ function ScoutSection({world, onStartScout, onInterview, onSign, onReject}: {
   </>;
 }
 
-export function CompanyPage({world, error, onContinueStory, onRestart, onAdvanceDay, onStartScout, onInterview, onSign, onReject}: {
+export function CompanyPage({world, error, onContinueStory, onRestart, onAdvanceDay, onStartScout, onInterview, onSign, onReject, onSignYichen, onInvest, onSuppress, onFinale}: {
   world: WorldState;
   error: string;
   onContinueStory: () => void;
@@ -169,34 +191,73 @@ export function CompanyPage({world, error, onContinueStory, onRestart, onAdvance
   onInterview: (id: string) => void;
   onSign: (id: string) => void;
   onReject: (id: string) => void;
+  onSignYichen: () => void;
+  onInvest: () => void;
+  onSuppress: () => void;
+  onFinale: (choice: string) => void;
 }) {
   const todo = todoFor(world);
-  const f = world.story.flags;
+  const blocker = world.pendingBlocker;
+  const xh = world.xinghuang ?? { hostility: 0, evidence: {} as Record<string, boolean> };
+  const evidenceCount = EVIDENCE_KEYS.filter(k => xh.evidence?.[k]).length;
   return <div className="page">
     <PageHeader title="工作室" subtitle={`${world.company.name} · 老板总览`}/>
     <div className="home-hero">
-      <small>MY LITTLE COMPANY · CHAPTER 00</small>
+      <small>MY LITTLE COMPANY · CHAPTER {Math.min(9, Math.floor((world.clock.absoluteDay - 1) / 30))}</small>
       <h3>{world.company.name}<br/>从这里，重返星途。</h3>
     </div>
+    {blocker?.kind === 'yichen' && <SoftCard tag="剧情事件 · 故人" title="沈亦辰在楼下等了你一个小时">
+      <p>「三年前你被踩下去的时候，全行业只有一个人公开为你说话——就是她。后来她自己也被正艺的偶像剧雪藏。今天她推了到手的角色，站在你的大堂里。」</p>
+      <p>「我不管你现在有多大。我赌你。」</p>
+      <StatLine label="条件" value="B 级演员 · 月薪 8 万 · 影视路线"/>
+      <footer><PrimaryButton onClick={onSignYichen}>签下沈亦辰　✦</PrimaryButton></footer>
+    </SoftCard>}
+    {blocker?.kind === 'finale' && <SoftCard tag="终章抉择 · 三证齐" title="最后的证据，都在你手里">
+      <p>旧账户流水、前经纪人证词、星煌内部邮件——三年前的真相齐了。怎么用，只此一次。</p>
+      <StatLine label="当前口碑" value={`${world.company.reputation} / 对峙线 70`}/>
+      <StatLine label="当前资金" value={formatWan(world.company.cashMinor) + ' / 对峙线 200 万'}/>
+      <div className="candidate-actions">
+        <PrimaryButton onClick={() => onFinale('confront')}>记者会上公开对峙（口碑 ≥70 且资金 ≥200 万 → 复仇之火）</PrimaryButton>
+        <GhostButton onClick={() => onFinale('legal')}>交给法律 · 白纸黑字（→ 清算之日，+300 万赔偿）</GhostButton>
+        <GhostButton onClick={() => onFinale('wait')}>再等等 · 我们还不够大</GhostButton>
+      </div>
+    </SoftCard>}
     <SoftCard tag="待办事项" title={todo.title}>
       <p>{todo.note}</p>
-      <footer><PrimaryButton onClick={onContinueStory}>{f.firstWeekSettled ? '回看序章与结算' : '进入剧情 / 推进'}　→</PrimaryButton></footer>
+      {world.story.flags.firstWeekSettled && <footer><PrimaryButton onClick={onAdvanceDay}>推进到下一天　›</PrimaryButton></footer>}
+      {!world.story.flags.firstWeekSettled && <footer><PrimaryButton onClick={onContinueStory}>进入剧情 / 推进　→</PrimaryButton></footer>}
     </SoftCard>
     <SoftCard tag="员工汇报" title="林知夏">
-      <p>{f.firstWeekSettled ? '「第一周的报表我整理好了。资金和口碑的变化都在账本里。」' :
-        world.clock.absoluteDay >= 5 ? '「星煌的动向我在盯着，有变化第一时间告诉你。」' :
-        '「合同和通告都在资料夹里。别忘了按时吃饭。」'}</p>
-      <footer><StatusTag tone="ok">执行经纪 · 在岗（任务容量 {world.staff.zhixia.capacity.used}/{world.staff.zhixia.capacity.max}）</StatusTag></footer>
+      <p>{world.story.flags.firstWeekSettled
+        ? evidenceCount < 3
+          ? '「我在盯着星煌。给钱就敢查——只是查一次 30 万，被盯上会更麻烦。」'
+          : '「三段证据齐了。什么时候动手，你说了算。」'
+        : world.clock.absoluteDay >= 5 ? '「星煌的动向我在盯着，有变化第一时间告诉你。」' : '「合同和通告都在资料夹里。别忘了按时吃饭。」'}</p>
+      <footer>
+        <StatusTag tone="ok">执行经纪 · 容量 {world.staff.zhixia.capacity.used}/{world.staff.zhixia.capacity.max}</StatusTag>
+        {world.story.flags.firstWeekSettled && evidenceCount < 3 &&
+          <GhostButton onClick={onInvest}>秘密调查（30 万 · 第 {evidenceCount + 1} 段）</GhostButton>}
+      </footer>
+      {evidenceCount > 0 && <div className="evidence-row">
+        {EVIDENCE_KEYS.map(k =>
+          <span key={k} className={'evidence-chip' + (xh.evidence?.[k] ? ' got' : '')} title={EVIDENCE_INFO[k].note}>
+            {xh.evidence?.[k] ? '✦ ' : '◇ '}{EVIDENCE_INFO[k].title}
+          </span>)}
+      </div>}
     </SoftCard>
+    {xh.hostility >= 2 && <SoftCard tag="星煌 · 敌对第 " title={'敌对度 ' + xh.hostility + ' / 3 档'}>
+      <p>黑稿在挂。花 8 万让公关部压下去（口碑 +2），或者随它去。</p>
+      <footer><GhostButton onClick={onSuppress}>花 8 万压热搜</GhostButton></footer>
+    </SoftCard>}
     {error && <div role="alert" className="error">{error}</div>}
-    {f.firstWeekSettled && <>
-      <ScoutSection world={world} onStartScout={onStartScout} onInterview={onInterview} onSign={onSign} onReject={onReject}/>
+    <ScoutSection world={world} onStartScout={onStartScout} onInterview={onInterview} onSign={onSign} onReject={onReject}/>
+    {world.story.flags.firstWeekSettled && <>
       <SoftCard tag="时间推进 · 唯一入口" title={`今天是 ${world.clock.month} 月 ${world.clock.day} 日`}>
-        <p>推进一天：员工与艺人执行当天安排，账目入账本，新的汇报会送到手机。出现必须处理的事件时推进会被暂停。</p>
+        <p>推进一天：排期执行、账目入账本、汇报送手机。每月 1 日通告市场刷新；月末发月薪、盘点公司等级。</p>
         <footer><PrimaryButton onClick={onAdvanceDay}>推进到下一天　›</PrimaryButton></footer>
       </SoftCard>
       <SoftCard title="想再走一遍？">
-        <p>重玩序章可以尝试另一种对话与公关选择。</p>
+        <p>重玩序章可以尝试另一种开局（当前进度会被覆盖，记得先存档）。</p>
         <footer><GhostButton onClick={onRestart}>重开序章 ↻</GhostButton></footer>
       </SoftCard>
     </>}
@@ -231,19 +292,58 @@ export function ArtistsPage({world}: {world: WorldState}) {
   </div>;
 }
 
-export function GigsPage({world}: {world: WorldState}) {
-  const gig = Object.values(world.gigs)[0];
-  const statusLabel = {available: '可接取', booked: '已接 · 待录制', shooting: '录制中', released: '已完成'} as Record<string, string>;
+const KIND_LABEL: Record<string, string> = {webdrama: '网剧', variety: '综艺', endorsement: '代言', show: '商演'};
+
+export function GigsPage({world, onBid, error, onFestBoost}: {
+  world: WorldState;
+  onBid: (gigId: string, artistId: string, bribeMinor: number) => void;
+  error: string;
+  onFestBoost: (boostId: string) => void;
+}) {
+  const artists = Object.values(world.artists);
+  const open = Object.values(world.gigs).filter(g => g.status === 'available');
+  const running = Object.values(world.gigs).filter(g => g.status === 'booked' || g.status === 'shooting');
+  const released = Object.values(world.gigs).filter(g => g.status === 'released');
+  const fest = world.festival;
   return <div className="page">
-    <PageHeader title="通告" subtitle="GIG MARKET"/>
-    {gig && world.story.flags.summerGigAccepted
-      ? <SoftCard tag={`${gig.platform ?? '青柠视频'} · 新人综艺`} title={gig.title}>
-          <p>三日录制，新人生活观察类轻综艺。{gig.status === 'released' ? '录制完成，账目已入账本。' : '通告已经接受，等待后续安排。'}</p>
-          <StatLine label="通告报酬" value={formatWan(gig.grossMinor)}/>
-          <StatLine label="预计公司收入" value={formatWan(gig.companyNetMinor)}/>
-          <StatLine label="状态" value={statusLabel[gig.status] ?? gig.status}/>
-        </SoftCard>
-      : <EmptyState icon="✦" title="市场暂时安静" note="正式的通告市场与竞标流程将在 M1 后续步骤接入。第一个机会会从剧情中到来。"/>}
+    <PageHeader title="通告" subtitle="GIG MARKET · 每月刷新"/>
+    {fest?.status === 'running' && <SoftCard tag="新星季 · 打榜" title={`第 ${fest.stage}/3 阶段进行中`}>
+      <p>这一阶段还没打榜——投入越多，舞台得分越高。</p>
+      <div className="candidate-actions">
+        {BOOSTS.map(b => <PrimaryButton key={b.id} onClick={() => onFestBoost(b.id)}>{b.label}（+{b.add} 分）</PrimaryButton>)}
+      </div>
+    </SoftCard>}
+    {open.length === 0 && running.length === 0
+      ? <EmptyState icon="✦" title="市场暂时安静" note="每月 1 日刷新一批新通告。第一个机会从剧情里来。"/>
+      : null}
+    {open.map(g => <SoftCard key={g.id} tag={`${g.grade} 级 · ${KIND_LABEL[g.kind ?? ''] ?? (g.kind ?? '')} · ${g.days} 天`} title={g.title}>
+      <StatLine label="总报酬" value={formatWan(g.grossMinor)}/>
+      <StatLine label="属性门槛" value={`${g.reqStat} / 100`}/>
+      {g.rival && <footer><StatusTag tone="warn">有竞争对手在抢（成功率 −12%）</StatusTag></footer>}
+      <div className="track-picker">
+        {artists.map(a => {
+          const score = bidScore(world, g as never, a as never, 0);
+          return <button key={a.id} type="button" className="track-option" onClick={() => onBid(g.id, a.id, 0)}
+            disabled={a.availability === 'onGig' || (a.fatigue ?? 0) >= 85}
+            aria-label={'让' + a.name + '接下，成功率' + score + '%'}>
+            <strong>{a.name} · {score}%</strong>
+            <small>直接接（不砸钱）· 疲劳 {a.fatigue ?? 0}</small>
+          </button>;
+        })}
+      </div>
+      <div className="candidate-actions">
+        {artists.map(a => <GhostButton key={'b' + a.id} onClick={() => onBid(g.id, a.id, 50000)}>砸 5 万竞标 · {a.name}</GhostButton>)}
+      </div>
+    </SoftCard>)}
+    {running.map(g => <SoftCard key={g.id} tag={`${g.grade} 级 · ${KIND_LABEL[g.kind ?? ''] ?? (g.kind ?? '')}`} title={g.title}>
+      <p>{g.status === 'shooting' ? '录制进行中，艺人吃的是盒饭和疲劳。' : '已排期，明天进组。'}</p>
+      <StatLine label="总报酬" value={formatWan(g.grossMinor)}/>
+      <StatLine label="收工日" value={`第 ${(g.startDay ?? 0) + (g.days ?? 0)} 日`}/>
+    </SoftCard>)}
+    {released.slice(-3).map(g => <SoftCard key={g.id} tag="已收工" title={g.title}>
+      <StatLine label="表现评分" value={`${g.perf ?? '—'} / 100`}/>
+    </SoftCard>)}
+    {error && <div role="alert" className="error">{error}</div>}
   </div>;
 }
 

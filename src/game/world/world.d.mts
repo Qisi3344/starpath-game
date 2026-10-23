@@ -33,16 +33,24 @@ export type WorkRecord = {
 
 export type CalendarBooking = {
   id: string; assigneeId: string; role: 'artist' | 'staff';
-  startAbsoluteDay: number; endAbsoluteDay: number;
+  startDay: number; days: number;
   kind: 'training' | 'gig' | 'scouting' | 'rest';
   linkedId: string; status: 'planned' | 'active' | 'done' | 'cancelled';
 };
 
+/** 公司等级（B0 存的是数字 1..4，advanceCompany 规范化为字符串） */
+export type CompanyLevel = 1 | 2 | 3 | 4 | 'small' | 'mid' | 'big' | 'giant';
+
 export type WorldGig = {
   id: string; title: string; platform?: string;
-  status: 'available' | 'booked' | 'shooting' | 'released';
+  kind?: 'webdrama' | 'variety' | 'endorsement' | 'show';
+  grade?: 'D' | 'C' | 'B' | 'A';
+  status: 'available' | 'booked' | 'shooting' | 'released' | 'expired' | 'failed';
   assignedArtistId: string | null;
-  grossMinor: number; companyNetMinor: number;
+  grossMinor: number; companyNetMinor?: number;
+  days?: number; reqStat?: number; rival?: boolean;
+  startDay?: number; score?: number; perf?: number;
+  offerMonth?: number; deadlineDay?: number;
 };
 
 export type WorldState = {
@@ -50,12 +58,22 @@ export type WorldState = {
   saveId: string;
   random: { seed: string; state: string };
   clock: { year: number; month: number; day: number; absoluteDay: number };
-  company: { name: string; cashMinor: number; reputation: number; level: number };
+  company: { name: string; cashMinor: number; reputation: number; level: CompanyLevel };
   staff: Record<string, Staff>;
   artists: Record<string, Artist>;
   candidatePool: Record<string, Candidate>;
   contracts: Record<string, unknown>;
   recruitment: Record<string, RecruitmentTask>;
+  /** 长线字段（M2/M3） */
+  ending: { id: string; title: string; body: string } | null;
+  deficitMonths?: number;
+  xinghuang?: { hostility: number; evidence: Record<string, boolean> };
+  festival?: {
+    status: 'idle' | 'signup' | 'running' | 'done';
+    stage: number; artistId: string | null;
+    boosts: number[]; boostAdd?: number;
+    lastStageDay?: number; log: string[];
+  };
   schedules: Record<string, CalendarBooking>;
   gigs: Record<string, WorldGig>;
   works: Record<string, WorkRecord>;

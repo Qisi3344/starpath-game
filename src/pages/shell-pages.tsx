@@ -49,10 +49,11 @@ export function DistrictPage({districtId, onBack}: {districtId: DistrictId; onBa
   </div>;
 }
 
-export function SchedulePage({world, onTrain, onRest, onFestSignup, error}: {
+export function SchedulePage({world, onTrain, onRest, onBond, onFestSignup, error}: {
   world: WorldState;
   onTrain: (artistId: string, tier: string, days: number) => void;
   onRest: (artistId: string, days: number) => void;
+  onBond: (artistId: string) => void;
   onFestSignup: (artistId: string) => void;
   error: string;
 }) {
@@ -81,8 +82,12 @@ export function SchedulePage({world, onTrain, onRest, onFestSignup, error}: {
           const busy = upcoming.find(s => s.assigneeId === a.id);
           return <SoftCard key={a.id} tag={`${a.grade} 级 · 疲劳 ${fatigue}`} title={a.name}>
             <div className="fatigue-bar"><div className="fatigue-fill" style={{width: fatigue + '%', background: fatigue > 70 ? '#a3221a' : fatigue > 40 ? '#b07a2a' : '#3f5a2c'}}/></div>
+            <div style={{marginBottom: 8}}>
+              <span style={{fontSize: 10, letterSpacing: '.2em', color: '#a68494'}}>好感 {a.bond ?? 0}/100</span>
+              <div className="fatigue-bar"><div className="fatigue-fill" style={{width: (a.bond ?? 0) + '%', background: (a.bond ?? 0) >= 80 ? '#c86bb3' : (a.bond ?? 0) >= 60 ? '#8a6bb3' : '#b07a8a'}}/></div>
+            </div>
             {busy
-              ? <p>第 {busy.startDay}–{busy.startDay + busy.days - 1} 日：{busy.kind === 'training' ? '特训（' + (TRAIN_TIERS[busy.linkedId]?.label ?? busy.linkedId) + '）' : '休息'}</p>
+              ? <p>第 {busy.startDay}–{busy.startDay + busy.days - 1} 日：{busy.kind === 'training' ? '特训（' + (TRAIN_TIERS[busy.linkedId]?.label ?? busy.linkedId) + '）' : busy.kind === 'bonding' ? '联络感情' : '休息'}</p>
               : <div className="track-picker">
                   {Object.entries(TRAIN_TIERS).map(([k, v]: [string, {costPerDayMinor: number; gain: number; label: string}]) =>
                     <button key={k} type="button" className="track-option" onClick={() => onTrain(a.id, k, 3)} disabled={fatigue >= 85}
@@ -91,6 +96,9 @@ export function SchedulePage({world, onTrain, onRest, onFestSignup, error}: {
                     </button>)}
                   <button type="button" className="track-option" onClick={() => onRest(a.id, 2)} aria-label="休息2天">
                     <strong>休息 × 2 天</strong><small>恢复 15 疲劳/天 · 免费</small>
+                  </button>
+                  <button type="button" className="track-option" onClick={() => onBond(a.id)} aria-label="联络感情">
+                    <strong>联络感情</strong><small>2 万 · 好感 +8 · ≥80 挚友收益 +10%</small>
                   </button>
                 </div>}
           </SoftCard>;

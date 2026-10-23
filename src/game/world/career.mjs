@@ -11,6 +11,40 @@ export const TRAIN_TIERS = {
   B: { costPerDayMinor: wan(5), gain: 5, label: 'B 级导师' },
 };
 export const FATIGUE_LIMIT = 85;
+export const BOND_COST_MINOR = wan(2);
+export const BOND_GAIN = 8;
+export const BOND_DECAY_PER_MONTH = 3;
+export const BOND_BUFF_AT = 80;
+export const BOND_TRUST_AT = 60;
+
+/** 联络感情：占 1 天排期，好感 +8。好感 ≥80 解锁羁绊加成（通告收益 +10%）。 */
+export function startBonding(state, command) {
+  const artist = state.artists[command.artistId];
+  if (!artist) throw Error('艺人不存在');
+  if (artist.availability === 'onGig') throw Error(artist.name + ' 正在通告中');
+  const days = 1;
+  const busy = isBusy(state, artist.id, dayOf(state), days);
+  if (busy) throw Error('档期冲突：' + artist.name + ' 今天已有安排');
+  if (state.company.cashMinor < BOND_COST_MINOR) throw Error('资金不足（2 万）');
+  if ((artist.bond ?? 0) >= 100) throw Error(artist.name + ' 的信任已经满溢，把机会留给别人吧');
+  const id = 'sch_bond_' + dayOf(state) + '_' + artist.id + '_' + Object.keys(state.schedules).length;
+  let next = {
+    ...state,
+    schedules: {
+      ...state.schedules,
+      [id]: { id, kind: 'bonding', assigneeId: artist.id, role: 'artist', startDay: dayOf(state), days, linkedId: '', status: 'planned' },
+    },
+    company: { ...state.company, cashMinor: state.company.cashMinor - BOND_COST_MINOR },
+  };
+  next = {
+    ...next,
+    ledger: [...next.ledger, {
+      id: ledgerEntryId(next) + '-bond', absoluteDay: dayOf(next), kind: 'expense',
+      category: 'bonding', amountMinor: BOND_COST_MINOR, note: '联络感情 · ' + artist.name,
+    }],
+  };
+  return { world: next, events: [{ type: 'bondingScheduled', scheduleId: id, artistId: artist.id }] };
+}
 export const FATIGUE_TRAIN = 8;
 export const FATIGUE_GIG = 10;
 export const FATIGUE_REST = -15;
@@ -119,6 +153,40 @@ export function advanceSchedules(state, events) {
         artists: { ...next.artists, [artist.id]: { ...artist, stats: { ...artist.stats, [stat]: artist.stats[stat] + gain }, fatigue: Math.min(100, (artist.fatigue ?? 0) + FATIGUE_TRAIN), availability: 'training' } },
         schedules: { ...next.schedules, [s.id]: { ...s, status: 'active' } },
       };
+    } else if (s.kind === 'bonding') {
+      const before = artist.bond ?? 0;
+      const after = Math.min(100, before + BOND_GAIN);
+      let patch = { bond: after, availability: 'idle' };
+      next = {
+        ...next,
+        artists: { ...next.artists, [artist.id]: { ...artist, ...patch } },
+        schedules: { ...next.schedules, [s.id]: { ...s, status: 'active' } },
+      };
+      // 羁绊里程碑（各一次性）：60 信任 → 表现 roll 加成；80 挚友 → 通告收益 +10%
+      if (before < BOND_TRUST_AT && after >= BOND_TRUST_AT) {
+        next = pushMessage(next, {
+          id: messageId(next, 'bond_trust_' + artist.id),
+          from: artist.name,
+          level: 'report',
+          title: '信任 · ' + artist.name,
+          body: '「跟了你这段时间，我确定当初没赌错。」好感突破 60——舞台上的她会更放得开。',
+          absoluteDay: day,
+        });
+        next = { ...next, events: { ...next.events, ['bond_trust_' + artist.id]: { id: 'bond_trust_' + artist.id, absoluteDay: day, type: 'bondMilestone' } } };
+        events.push({ type: 'bondTrust', artistId: artist.id });
+      }
+      if (before < BOND_BUFF_AT && after >= BOND_BUFF_AT) {
+        next = pushMessage(next, {
+          id: messageId(next, 'bond_best_' + artist.id),
+          from: '知夏 · 备注',
+          level: 'summary',
+          title: '挚友 · ' + artist.name,
+          body: '好感 80。她已经把这里当家了——之后的通告，她愿意少拿一成报酬跟你一起拼（收益 +10%）。',
+          absoluteDay: day,
+        });
+        next = { ...next, events: { ...next.events, ['bond_best_' + artist.id]: { id: 'bond_best_' + artist.id, absoluteDay: day, type: 'bondMilestone' } } };
+        events.push({ type: 'bondBestFriend', artistId: artist.id });
+      }
     } else if (s.kind === 'rest') {
       next = {
         ...next,
@@ -131,8 +199,18 @@ export function advanceSchedules(state, events) {
   return { world: next, events };
 }
 
+/** 月末好感自然衰减（advanceCompany 之后调用） */
+export function decayBond(state, events) {
+  let next = state;
+  for (const a of Object.values(next.artists)) {
+    const b = a.bond ?? 0;
+    if (b > 0) next = { ...next, artists: { ...next.artists, [a.id]: { ...a, bond: Math.max(0, b - BOND_DECAY_PER_MONTH) } } };
+  }
+  return { world: next, events };
+}
+
 /** 新艺人入场补充字段（疲劳/月薪），供招募与剧情签约共用 */
 export function ensureCareerFields(artist, grade) {
   const salary = { D: wan(0.5), C: wan(2), B: wan(8), A: wan(20), S: wan(50) }[grade] ?? wan(0.5);
-  return { ...artist, fatigue: artist.fatigue ?? 0, salaryMinor: artist.salaryMinor ?? salary, grade };
+  return { ...artist, fatigue: artist.fatigue ?? 0, salaryMinor: artist.salaryMinor ?? salary, bond: artist.bond ?? 0, grade };
 }

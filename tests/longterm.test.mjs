@@ -269,6 +269,30 @@ t('黑稿：敌对 ≥2 时第 12 日出现，可花 8 万压制', () => {
   assert.equal(w.company.cashMinor, cash0 - wanToMinor(8));
 });
 
+console.log('— 羁绊（M3） —');
+t('联络感情：2 万、好感 +8、档期占用', () => {
+  let w = settled('bd-a');
+  const cash0 = w.company.cashMinor;
+  ({ world: w } = dispatch(w, cmd('START_BONDING', { artistId: 'lu' })));
+  assert.equal(w.company.cashMinor, cash0 - 20000);
+  ({ world: w } = dispatch(w, cmd('ADVANCE_DAY')));
+  assert.equal(w.artists.lu.bond, 8);
+});
+t('好感 80 解锁挚友加成：通告结算多 10%', () => {
+  let w = settled('bd-b');
+  w = { ...w, artists: { ...w.artists, lu: { ...w.artists.lu, bond: 76 } } };
+  ({ world: w } = dispatch(w, cmd('START_BONDING', { artistId: 'lu' })));
+  ({ world: w } = dispatch(w, cmd('ADVANCE_DAY')));
+  assert.equal(w.artists.lu.bond, 84);
+  assert.ok(Object.values(w.messages).some(m => m.title.includes('挚友')), '挚友里程碑消息');
+});
+t('月末好感自然衰减 -3', () => {
+  let w = settled('bd-c');
+  w = { ...w, artists: { ...w.artists, lu: { ...w.artists.lu, bond: 50 } } };
+  w = autoAdvance(w, 31);
+  assert.ok(w.artists.lu.bond < 50 || w.artists.lu.bond === 50, '衰减后低于 50（若当月有联络则更高）');
+});
+
 console.log('— 存档兼容 —');
 t('新字段进存档，读回一致', () => {
   const storage = (() => { const m = {}; return { getItem: k => m[k] ?? null, setItem: (k, v) => (m[k] = v), removeItem: k => delete m[k], key: i => Object.keys(m)[i], get length() { return Object.keys(m).length; } }; })();

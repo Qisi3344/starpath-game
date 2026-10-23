@@ -34,7 +34,7 @@ export type WorkRecord = {
 export type CalendarBooking = {
   id: string; assigneeId: string; role: 'artist' | 'staff';
   startDay: number; days: number;
-  kind: 'training' | 'gig' | 'scouting' | 'rest';
+  kind: 'training' | 'gig' | 'scouting' | 'rest' | 'bonding';
   linkedId: string; status: 'planned' | 'active' | 'done' | 'cancelled';
 };
 

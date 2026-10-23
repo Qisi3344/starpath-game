@@ -201,6 +201,7 @@ export default function App() {
   };
   const onTrain = (artistId: string, tier: string, days: number) => run([{type: 'START_TRAINING', artistId, tier, days}], '排期失败');
   const onRest = (artistId: string, days: number) => run([{type: 'START_REST', artistId, days}], '排期失败');
+  const onBond = (artistId: string) => run([{type: 'START_BONDING', artistId}], '排期失败');
   const onBid = (gigId: string, artistId: string, bribeMinor: number) => run([{type: 'BID_GIG', gigId, artistId, bribeMinor}], '竞标失败');
   const onSignYichen = () => run([{type: 'SIGN_YICHEN'}], '签约失败');
   const onSuppress = () => run([{type: 'SUPPRESS_SMEAR'}], '压制失败');
@@ -245,7 +246,7 @@ export default function App() {
         onStartScout={onStartScout} onInterview={onCandidate('INTERVIEW_CANDIDATE')} onSign={onCandidate('SIGN_CANDIDATE')} onReject={onCandidate('REJECT_CANDIDATE')}
         onSignYichen={onSignYichen} onInvest={onInvest} onSuppress={onSuppress} onFinale={onFinale}/>;
       case 'artists': return <ArtistsPage world={world}/>;
-      case 'schedule': return <SchedulePage world={world} onTrain={onTrain} onRest={onRest} onFestSignup={onFestSignup} error={error}/>;
+      case 'schedule': return <SchedulePage world={world} onTrain={onTrain} onRest={onRest} onBond={onBond} onFestSignup={onFestSignup} error={error}/>;
       case 'gigs': return <GigsPage world={world} onBid={onBid} error={error} onFestBoost={onFestBoost}/>;
     }
   };

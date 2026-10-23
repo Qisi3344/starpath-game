@@ -176,7 +176,9 @@ export function advanceGigs(state, events) {
     const r = nextFloat(next.random.state);
     next = { ...next, random: { ...next.random, state: serializeRandomState(r.state) } };
     const stat = artist.stats[primaryStatOf(artist)];
-    const perf = clampPct(Math.round(stat * 0.7 + r.value * 40));   // 0-100 表现
+    // 挚友信任（好感 ≥60）让她在镜头前更放得开
+    const bondEdge = (artist.bond ?? 0) >= 60 ? (artist.bond ?? 0) * 0.06 : 0;
+    const perf = clampPct(Math.round(stat * 0.7 + bondEdge + r.value * 40));   // 0-100 表现
     const fanGain = Math.round(perf * (gig.grade === 'A' ? 260 : gig.grade === 'B' ? 150 : gig.grade === 'C' ? 70 : 30));
     const repGain = perf >= 80 ? 3 : perf >= 60 ? 2 : 1;
     const workId = 'work_' + gig.id;
@@ -201,13 +203,15 @@ export function advanceGigs(state, events) {
     const shareRate = { D: 0.3, C: 0.4, B: 0.5, A: 0.6 }[gig.grade] ?? 0.3;
     const artistShare = Math.round((gross - platformFee) * shareRate);
     const net = gross - platformFee - artistShare;
+    const bondBonus = (artist.bond ?? 0) >= 80 ? Math.round(net * 0.1) : 0;
     next = {
       ...next,
-      company: { ...next.company, cashMinor: next.company.cashMinor + net },
+      company: { ...next.company, cashMinor: next.company.cashMinor + net + bondBonus },
       ledger: [...next.ledger,
         { id: ledgerEntryId(next) + '-gin', absoluteDay: day, kind: 'income', category: 'gig', amountMinor: gross, note: gig.title + ' · 总报酬' },
         { id: ledgerEntryId(next) + '-gpf', absoluteDay: day, kind: 'expense', category: 'platform_fee', amountMinor: platformFee, note: '平台抽成 30%' },
         { id: ledgerEntryId(next) + '-gsh', absoluteDay: day, kind: 'expense', category: 'artist_share', amountMinor: artistShare, note: '艺人分成 ' + Math.round(shareRate * 100) + '%' },
+        ...(bondBonus ? [{ id: ledgerEntryId(next) + '-gbo', absoluteDay: day, kind: 'income', category: 'bond_bonus', amountMinor: bondBonus, note: artist.name + ' 拼尽全力的加成' }] : []),
       ],
     };
     next = pushMessage(next, {

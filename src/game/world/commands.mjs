@@ -12,7 +12,7 @@ import {
 } from './state.mjs';
 import { nextFloat, serializeRandomState } from './random.mjs';
 import { advanceRecruitment, startScouting, interviewCandidate, signCandidate, rejectCandidate } from './recruitment.mjs';
-import { startTraining, startRest, advanceSchedules, ensureCareerFields } from './career.mjs';
+import { startTraining, startRest, startBonding, advanceSchedules, decayBond, ensureCareerFields } from './career.mjs';
 import { refreshMarket, bidGig, advanceGigs } from './gigs.mjs';
 import { advanceCompany, advanceHostility, suppressSmear } from './company.mjs';
 import { advanceFestival, signupFestival, boostFestival } from './festival.mjs';
@@ -105,6 +105,7 @@ function runCommand(state, command) {
     case 'REJECT_CANDIDATE': return rejectCandidate(state, command);
     case 'START_TRAINING': return startTraining(state, command);
     case 'START_REST': return startRest(state, command);
+    case 'START_BONDING': return startBonding(state, command);
     case 'BID_GIG': return bidGig(state, command);
     case 'SIGN_YICHEN': return signYichen(state);
     case 'SUPPRESS_SMEAR': return suppressSmear(state, command);
@@ -309,6 +310,9 @@ function advanceDay(state) {
     // M2：月薪 / 运营 / 等级晋升 / 赤字计数
     const comp = advanceCompany(next, events);
     next = comp.world;
+    // M3：月末好感自然衰减
+    const decay = decayBond(next, events);
+    next = decay.world;
     // M3：终章检查（三证集齐 → 挂抉择）与破产结局
     const finale = checkFinale(next, events);
     next = finale.world;

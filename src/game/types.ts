@@ -31,6 +31,8 @@ export type Artist = {
   fatigue?: number;
   /** 月薪（minor）；月末统一发放 */
   salaryMinor?: number;
+  /** 好感 0-100（M3 羁绊）：≥60 表现加成，≥80 通告收益 +10% */
+  bond?: number;
 };
 
 /** 员工（M1 仅林知夏可用；字段为员工系统预留） */

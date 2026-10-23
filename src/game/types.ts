@@ -27,6 +27,12 @@ export type Artist = {
   history: { date: GameDate; note: string }[];
   /** 培养方向：玩家可改，员工按此执行训练计划 */
   growthGoal: string;
+  /** 疲劳 0-100：≥85 拒绝新工作（B2） */
+  fatigue?: number;
+  /** 月薪（minor）；月末统一发放 */
+  salaryMinor?: number;
+  /** 好感 0-100（M3 羁绊）：≥60 表现加成，≥80 通告收益 +10% */
+  bond?: number;
 };
 
 /** 员工（M1 仅林知夏可用；字段为员工系统预留） */

@@ -1,7 +1,8 @@
 import {useEffect, useRef, useState} from 'react';
 import {PROLOGUE, CHAPTER_LABEL, sceneLabel, type StoryContext} from './script';
 import {SceneBackdrop, CharacterArt} from './artwork';
-import type {GameState} from '../game/engine.mjs';
+import type {WorldState} from '../game/world/world.d.mts';
+import {formatWan} from '../game/world/format.mjs';
 
 /*
  * 剧情播放器（全屏层）：展示与交互上抛，推进与引擎调用集中在 App。
@@ -18,9 +19,9 @@ export type StoryView = {
   curtain: 'none' | 'resume' | 'contract' | 'settlement';
 };
 
-export function StoryPlayer({story, game, onName, onNext, onChoice, onSkip, onExit, onRestart, onDismissCurtain, onConfirmSettlement}: {
+export function StoryPlayer({story, world, onName, onNext, onChoice, onSkip, onExit, onRestart, onDismissCurtain, onConfirmSettlement}: {
   story: StoryView;
-  game: GameState | null;
+  world: WorldState;
   onName: (name: string) => void;
   onNext: () => void;
   onChoice: (value: string) => void;
@@ -32,10 +33,10 @@ export function StoryPlayer({story, game, onName, onNext, onChoice, onSkip, onEx
 }) {
   const step = PROLOGUE[Math.min(story.idx, PROLOGUE.length - 1)];
   const ctx: StoryContext = {
-    company: game?.company ?? '星芒工作室',
+    company: world.company.name ?? '星芒工作室',
     mood: story.mood,
-    trained: game?.trained ?? false,
-    pr: game?.pr ?? null,
+    trained: world.story.flags.trained === true,
+    pr: typeof world.story.flags.prChoice === 'string' ? world.story.flags.prChoice : null,
   };
   const [auto, setAuto] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -129,7 +130,7 @@ export function StoryPlayer({story, game, onName, onNext, onChoice, onSkip, onEx
       <button className="pale-btn" style={{display: 'block', margin: '12px auto'}} onClick={onDismissCurtain}>返回通告决策</button>
     </div>}
 
-    {story.curtain === 'settlement' && game && <div className="curtain active" onClick={e => e.stopPropagation()}>
+    {story.curtain === 'settlement' && <div className="curtain active" onClick={e => e.stopPropagation()}>
       <div style={{textAlign: 'center', fontSize: '10px', letterSpacing: '.24em', color: '#a98694', margin: '20px 0'}}>CHAPTER 00 · FINISHED</div>
       <h2 style={{textAlign: 'center'}}>第一束聚光灯</h2>
       <div className="receipt">
@@ -138,11 +139,11 @@ export function StoryPlayer({story, game, onName, onNext, onChoice, onSkip, onEx
         <div className="statline"><span>平台抽成</span><b>-7.5万</b></div>
         <div className="statline"><span>艺人分成</span><b>-5.25万</b></div>
         <div className="statline"><span>运营支出</span><b>-2.5万</b></div>
-        <div className="statline"><span>唱跳训练</span><b>{game.trained ? '-1万' : '未安排'}</b></div>
-        <div className="statline"><span>公关支出</span><b>{game.pr === 'lawyer' ? '-20万' : '0万'}</b></div>
-        <div className="statline total"><span>公司当前资金</span><b>{game.money.toFixed(2)}万</b></div>
-        <div className="statline"><span>陆星遥人气</span><b>{(5000 + (game.settled ? (game.trained ? 3600 : 2400) : 0)).toLocaleString()}</b></div>
-        <div className="statline"><span>公司口碑</span><b>{game.reputation}</b></div>
+        <div className="statline"><span>唱跳训练</span><b>{world.story.flags.trained ? '-1万' : '未安排'}</b></div>
+        <div className="statline"><span>公关支出</span><b>{world.story.flags.prChoice === 'lawyer' ? '-20万' : '0万'}</b></div>
+        <div className="statline total"><span>公司当前资金</span><b>{formatWan(world.company.cashMinor)}</b></div>
+        <div className="statline"><span>陆星遥人气</span><b>{(world.artists.lu?.fans ?? 5000).toLocaleString()}</b></div>
+        <div className="statline"><span>公司口碑</span><b>{world.company.reputation}</b></div>
       </div>
       <p style={{fontSize: '12px', lineHeight: 1.9, color: '#85727b'}}>第一周完成。星煌的阴影还在，但你的工作室终于拥有了第一束属于自己的光。</p>
       <button className="btn-primary" onClick={onConfirmSettlement}>返回工作室</button>

@@ -11,6 +11,7 @@ import {
   clockFromAbsolute, ledgerEntryId, messageId, recordEvent, pushMessage,
 } from './state.mjs';
 import { nextFloat, serializeRandomState } from './random.mjs';
+import { advanceRecruitment, startScouting, interviewCandidate, signCandidate, rejectCandidate } from './recruitment.mjs';
 
 const wan = n => Math.round(n * MINOR_PER_WAN);
 
@@ -93,6 +94,10 @@ function runCommand(state, command) {
     case 'PR_DECIDE': return prDecide(state, command);
     case 'ADVANCE_DAY': return advanceDay(state);
     case 'SETTLE_FIRST_WEEK': return settleFirstWeek(state);
+    case 'START_SCOUTING': return startScouting(state, command);
+    case 'INTERVIEW_CANDIDATE': return interviewCandidate(state, command);
+    case 'SIGN_CANDIDATE': return signCandidate(state, command);
+    case 'REJECT_CANDIDATE': return rejectCandidate(state, command);
     case 'SET_STORY_FLAG': {
       // 剧情标记（如序章心境 mood）：进存档，读档后剧情文案可复现
       if (typeof command.key !== 'string' || command.key.length === 0) throw Error('缺少剧情标记名');
@@ -231,7 +236,10 @@ function advanceDay(state) {
     events.push({ type: 'gigReleased', gigId: SUMMER_GIG.id });
   }
 
-  // 4. 机会过期处理：B0 阶段无候选/外部机会；B1 在此处按截止日统一裁决
+  // 4. 机会过期与委派结算：寻访任务到期生成候选档案、过窗候选被截胡/退场（B1）
+  const recruit = advanceRecruitment(next, events);
+  next = recruit.world;
+
   // 5. 持久化随机数驱动的世界脉搏（每次推进恰好消耗 1 个随机数，保证读档重放一致）
   const roll = nextFloat(next.random.state);
   next = { ...next, random: { ...next.random, state: serializeRandomState(roll.state) } };

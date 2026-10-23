@@ -176,6 +176,22 @@ export default function App() {
     } catch (e) { setError(e instanceof Error ? e.message : '推进失败'); }
   };
 
+  // ---- 委派招募（B1 · Issue #2）：发起寻访与候选审批都走唯一命令通道 ----
+  const onStartScout = (track: string) => {
+    try {
+      exec([{type: 'START_SCOUTING', track}]);
+      setError('');
+      setUnread(1);
+    } catch (e) { setError(e instanceof Error ? e.message : '寻访发起失败'); }
+  };
+  const onCandidate = (type: 'INTERVIEW_CANDIDATE' | 'SIGN_CANDIDATE' | 'REJECT_CANDIDATE') => (candidateId: string) => {
+    try {
+      exec([{type, candidateId}]);
+      setError('');
+      setUnread(1);
+    } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); }
+  };
+
   const overlay = nav.overlay === 'story'
     ? <StoryPlayer story={story} world={world}
         onName={storyName} onNext={storyNext} onChoice={storyChoice} onSkip={storySkip}
@@ -208,7 +224,8 @@ export default function App() {
     }
     switch (nav.tab) {
       case 'map': return <MapPage onOpenDistrict={id => dispatchNav({type: 'PUSH', page: 'district:' + id})}/>;
-      case 'company': return <CompanyPage world={world} error={error} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})} onRestart={storyRestart} onAdvanceDay={advanceDay}/>;
+      case 'company': return <CompanyPage world={world} error={error} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})} onRestart={storyRestart} onAdvanceDay={advanceDay}
+        onStartScout={onStartScout} onInterview={onCandidate('INTERVIEW_CANDIDATE')} onSign={onCandidate('SIGN_CANDIDATE')} onReject={onCandidate('REJECT_CANDIDATE')}/>;
       case 'artists': return <ArtistsPage world={world}/>;
       case 'schedule': return <SchedulePage world={world} onContinueStory={() => dispatchNav({type: 'OPEN_OVERLAY', kind: 'story'})}/>;
       case 'gigs': return <GigsPage world={world}/>;

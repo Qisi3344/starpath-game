@@ -240,3 +240,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-prim
   .district-point { width: 105px; }
   .district-north, .district-south { left: calc(50% - 52px); }
 }
+
+/* —— B1 委派招募：方向选择与候选人审批 —— */
+.track-picker { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+.track-option { display:flex; flex-direction:column; gap:3px; text-align:left;
+  padding:11px 12px; border:1px solid #e3ccd3; border-radius:14px; background:#fdf6f2;
+  font:inherit; color:#6d5560; cursor:pointer; }
+.track-option:disabled { opacity:.45; cursor:default; }
+.track-option strong { font-size:12px; font-weight:600; }
+.track-option small { font-size:10px; color:#a08b95; line-height:1.4; }
+.candidate-card { border:1px solid #ecd9de; border-radius:14px; background:#fffaf6;
+  padding:12px; margin:10px 0; }
+.candidate-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.candidate-head strong { font-size:15px; font-weight:600; color:#5d4752; }
+.candidate-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.candidate-actions .btn-primary, .candidate-actions .btn-ghost { flex:1 1 30%; padding:9px 6px; font-size:11px; min-height:38px; }
+.candidate-card footer { margin-top:8px; }

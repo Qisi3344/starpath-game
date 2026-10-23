@@ -2,5 +2,6 @@
 export * from './state.mjs';
 export * from './random.mjs';
 export * from './commands.mjs';
+export * from './recruitment.mjs';
 export * from './save.mjs';
 export * from './format.mjs';

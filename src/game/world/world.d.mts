@@ -53,9 +53,9 @@ export type WorldState = {
   company: { name: string; cashMinor: number; reputation: number; level: number };
   staff: Record<string, Staff>;
   artists: Record<string, Artist>;
-  candidatePool: Record<string, unknown>;
+  candidatePool: Record<string, Candidate>;
   contracts: Record<string, unknown>;
-  recruitment: Record<string, unknown>;
+  recruitment: Record<string, RecruitmentTask>;
   schedules: Record<string, CalendarBooking>;
   gigs: Record<string, WorldGig>;
   works: Record<string, WorkRecord>;
@@ -84,7 +84,45 @@ export type WorldEvent =
   | { type: 'worldPulse' }
   | { type: 'monthlyClosed'; month: number; netMinor: number }
   | { type: 'dayAdvanced'; absoluteDay: number }
-  | { type: 'weekSettled'; netMinor: number; fanDelta: number };
+  | { type: 'weekSettled'; netMinor: number; fanDelta: number }
+  | { type: 'scoutStarted'; taskId: string }
+  | { type: 'scoutReported'; taskId: string; count: number }
+  | { type: 'candidateInterviewed'; candidateId: string }
+  | { type: 'candidatePoached'; candidateId: string }
+  | { type: 'candidateExpired'; candidateId: string }
+  | { type: 'candidateRejected'; candidateId: string };
+
+/** 候选人档案（B1 实现形状；types.ts 里的草案以此为准修订） */
+export type Candidate = {
+  id: string;
+  name: string;
+  track: 'idol' | 'actor' | 'variety';
+  grade: 'A' | 'B' | 'C';
+  stats: { performance: number; appearance: number; appeal: number };
+  demand: { signBonusMinor: number; shareRate: number; months: number };
+  risk: string;
+  status: 'pending' | 'negotiating' | 'signed' | 'rejected' | 'expired' | 'poached';
+  interviewed: boolean;
+  reportDay: number;
+  expiresDay: number;
+  signedArtistId: string | null;
+  origin: 'scout';
+};
+
+/** 寻访任务（占员工容量，随 ADVANCE_DAY 结算） */
+export type RecruitmentTask = {
+  id: string;
+  kind: 'recruitment';
+  title: string;
+  ownerId: string;
+  channel: 'scout';
+  targetProfile: { track: string };
+  budgetMinor: number;
+  startedAt: number;
+  dueDay: number;
+  status: 'active' | 'done';
+  result?: string[];
+};
 
 export type WorldCommand =
   | { type: 'RENAME_COMPANY'; commandId: string; name: string }
@@ -94,6 +132,10 @@ export type WorldCommand =
   | { type: 'PR_DECIDE'; commandId: string; method: 'lawyer' | 'statement' | 'cold' }
   | { type: 'ADVANCE_DAY'; commandId: string }
   | { type: 'SETTLE_FIRST_WEEK'; commandId: string }
+  | { type: 'START_SCOUTING'; commandId: string; track: string }
+  | { type: 'INTERVIEW_CANDIDATE'; commandId: string; candidateId: string }
+  | { type: 'SIGN_CANDIDATE'; commandId: string; candidateId: string }
+  | { type: 'REJECT_CANDIDATE'; commandId: string; candidateId: string }
   | { type: 'SET_STORY_FLAG'; commandId: string; key: string; value?: boolean | number | string };
 
 export declare function dispatch(world: WorldState, command: WorldCommand): { world: WorldState; events: WorldEvent[] };
